@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>JN Chairs &amp; Tables Ledger</title>
+<title>JN Business Chairs &amp; Tables Ledger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -156,7 +156,7 @@
     width:34px; height:34px; border-radius:50%;
     background:var(--brass);
     display:flex;align-items:center;justify-content:center;
-    color:var(--forest); font-family:'Fraunces',serif; font-weight:700; font-size:15px;
+    color:var(--forest); font-family:'Fraunces',serif; font-weight:700; font-size:13px;
   }
   .brand h1{font-size:18px; margin:0; color:var(--white); letter-spacing:0.01em;}
   .brand span{display:block; font-size:11px; color:var(--brass-2); letter-spacing:0.08em; text-transform:uppercase; margin-top:1px;}
@@ -333,17 +333,17 @@
 <!-- ================= LOGIN ================= -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="login-eyebrow">Barangay Property Desk</div>
+    <div class="login-eyebrow">JN Business</div>
     <h1>Chairs &amp; Tables Ledger</h1>
-    <p class="login-sub">Sign in to record rentals and borrowings.</p>
+    <p class="login-sub">Sign in with your staff account to record rentals and borrowings.</p>
     <div id="setupNotice" class="setup-notice hidden">
       This app isn't connected to a database yet. Open <span class="mono">index.html</span>, find the <span class="mono">SUPABASE_URL</span> and <span class="mono">SUPABASE_ANON_KEY</span> lines near the top of the script, and paste in your project's values. See the setup guide provided alongside this file.
     </div>
     <div id="loginError" class="login-error hidden">Incorrect username or password. Try again.</div>
     <form id="loginForm">
       <div class="field">
-        <label for="loginUser">Username</label>
-        <input type="text" id="loginUser" autocomplete="username" required>
+        <label for="loginUser">Work email</label>
+        <input type="email" id="loginUser" autocomplete="username" required>
       </div>
       <div class="field">
         <label for="loginPass">Password</label>
@@ -359,13 +359,16 @@
   <header class="top">
     <div class="top-row">
       <div class="brand">
-        <div class="brand-mark">B</div>
+        <div class="brand-mark">JN</div>
         <div>
           <h1>Chairs &amp; Tables Ledger</h1>
           <span>Rent &amp; Barrow Records</span>
         </div>
       </div>
-      <button class="logout-link" id="logoutBtn">Sign out</button>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span id="signedInAs" style="font-size:12px; color:var(--brass-2);"></span>
+        <button class="logout-link" id="logoutBtn">Sign out</button>
+      </div>
     </div>
     <nav class="tabs">
       <button data-view="newRent" class="active">New Rent</button>
@@ -555,12 +558,9 @@
   // CONFIG — paste your Supabase project values here
   // (Project Settings -> API in your Supabase dashboard)
   // =========================================================
-  var SUPABASE_URL = "https://bfssisftrdobpvmjnzsp.supabase.co";
-  var SUPABASE_ANON_KEY = "sb_publishable_bsbM1AbwGI17Ln0uD16-Tg_fkYDX0Wx";
+  var SUPABASE_URL = "YOUR_SUPABASE_URL";
+  var SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
   // =========================================================
-
-  var USERNAME = "hofilena01";
-  var PASSWORD = "12345JN";
 
   var CONFIGURED = SUPABASE_URL.indexOf('YOUR_') !== 0 && SUPABASE_ANON_KEY.indexOf('YOUR_') !== 0;
   var db = null;
@@ -619,7 +619,9 @@
       dateOutISO: row.date_out,
       status: row.status,
       dateReturned: row.date_returned ? formatDate(row.date_returned) : null,
-      receivedBy: row.received_by
+      receivedBy: row.received_by,
+      createdBy: row.created_by || null,
+      returnedByAccount: row.returned_by_account || null
     };
   }
 
@@ -662,35 +664,52 @@
     document.getElementById('setupNotice').classList.remove('hidden');
   }
 
-  async function enterApp(){
+  var currentUserEmail = null;
+
+  async function enterApp(email){
+    currentUserEmail = email || null;
     loginScreen.classList.add('hidden');
     app.classList.remove('hidden');
+    var whoEl = document.getElementById('signedInAs');
+    if (whoEl) whoEl.textContent = currentUserEmail || '';
     document.getElementById('logTableWrap').innerHTML = '<div class="empty-state">Loading records&hellip;</div>';
     await refreshRecords();
     renderAll();
   }
 
   async function checkSession(){
-    if (sessionStorage.getItem('brgy_logged_in') === '1'){
-      await enterApp();
+    if (!db){ return; }
+    var res = await db.auth.getSession();
+    if (res.data && res.data.session){
+      await enterApp(res.data.session.user.email);
     }
   }
 
   loginForm.addEventListener('submit', async function(e){
     e.preventDefault();
-    var u = document.getElementById('loginUser').value.trim();
-    var p = document.getElementById('loginPass').value;
-    if (u === USERNAME && p === PASSWORD){
-      sessionStorage.setItem('brgy_logged_in', '1');
-      loginError.classList.add('hidden');
-      await enterApp();
-    } else {
+    if (!db){
+      loginError.textContent = 'This app is not connected to a database yet — see the setup guide.';
       loginError.classList.remove('hidden');
+      return;
     }
+    var email = document.getElementById('loginUser').value.trim();
+    var password = document.getElementById('loginPass').value;
+    var submitBtn = loginForm.querySelector('button[type=submit]');
+    submitBtn.disabled = true; submitBtn.textContent = 'Signing in...';
+    var res = await db.auth.signInWithPassword({ email: email, password: password });
+    submitBtn.disabled = false; submitBtn.textContent = 'Sign in';
+    if (res.error){
+      loginError.textContent = 'Could not sign in: ' + res.error.message;
+      loginError.classList.remove('hidden');
+      return;
+    }
+    loginError.classList.add('hidden');
+    await enterApp(res.data.user.email);
   });
 
-  document.getElementById('logoutBtn').addEventListener('click', function(){
-    sessionStorage.removeItem('brgy_logged_in');
+  document.getElementById('logoutBtn').addEventListener('click', async function(){
+    if (db) await db.auth.signOut();
+    currentUserEmail = null;
     app.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     loginForm.reset();
@@ -861,7 +880,8 @@
           '<dt>Phone</dt><dd>' + escapeHtml(rec.phone) + '</dd>' +
           '<dt>Date out</dt><dd class="mono">' + rec.dateOut + '</dd>' +
           '<dt>Items</dt><dd>' + escapeHtml(itemsSummary(rec)) + '</dd>' +
-          (!isOut ? '<dt>Date returned</dt><dd class="mono">' + rec.dateReturned + '</dd><dt>Received by</dt><dd>' + escapeHtml(rec.receivedBy) + '</dd>' : '') +
+          (isOut ? '<dt>Logged by</dt><dd class="mono">' + escapeHtml(rec.createdBy) + '</dd>' : '') +
+          (!isOut ? '<dt>Date returned</dt><dd class="mono">' + rec.dateReturned + '</dd><dt>Received by</dt><dd>' + escapeHtml(rec.receivedBy) + '</dd><dt>Confirmed by</dt><dd class="mono">' + escapeHtml(rec.returnedByAccount) + '</dd>' : '') +
         '</dl>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-print-stub="1">Print / Save PDF</button>' +
       '</div>';
@@ -886,13 +906,14 @@
         'td.label{color:#666;width:130px;}' +
         '.stamp{display:inline-block;border:2px solid ' + (isOut ? '#A97D3A' : '#1B4332') + '; color:' + (isOut ? '#A97D3A' : '#1B4332') + '; padding:4px 12px;border-radius:4px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:16px;}' +
       '</style></head><body>' +
-      '<div class="sub">Barangay Chairs &amp; Tables Ledger</div>' +
+      '<div class="sub">JN Business Chairs &amp; Tables Ledger</div>' +
       '<h1>' + rec.id + ' &mdash; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' Record</h1>' +
       '<div class="stamp">' + (isOut ? 'Recorded' : 'Returned') + '</div>' +
       '<table>' +
         row('Name', rec.name) + row('Barangay', rec.barangay) + row('Phone', rec.phone) +
         row('Date out', rec.dateOut) + row('Items', itemsSummary(rec)) +
-        (!isOut ? row('Date returned', rec.dateReturned) + row('Received by', rec.receivedBy) : '') +
+        (isOut ? row('Logged by', rec.createdBy) : '') +
+        (!isOut ? row('Date returned', rec.dateReturned) + row('Received by', rec.receivedBy) + row('Confirmed by', rec.returnedByAccount) : '') +
       '</table>' +
       '</body></html>';
     win.document.write(html);
@@ -914,11 +935,12 @@
         '<td>' + escapeHtml(r.phone) + '</td>' +
         '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
         '<td>' + r.dateOut + '</td>' +
+        '<td>' + escapeHtml(r.createdBy) + '</td>' +
         '<td>' + (r.status === 'out' ? 'Still out' : 'Returned') + '</td>' +
-        '<td>' + (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) : '&mdash;') + '</td>' +
+        '<td>' + (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) + ' (' + escapeHtml(r.returnedByAccount) + ')' : '&mdash;') + '</td>' +
       '</tr>';
     }).join('');
-    var html = '<!DOCTYPE html><html><head><title>Barangay Ledger Report</title><meta charset="utf-8">' +
+    var html = '<!DOCTYPE html><html><head><title>JN Business Ledger Report</title><meta charset="utf-8">' +
       '<style>' +
         'body{font-family: Georgia, serif; padding:24px; color:#1F2A24;}' +
         'h1{font-size:18px;margin:0 0 2px;}' +
@@ -927,9 +949,9 @@
         'th{background:#EFE9D8;text-align:left;padding:6px 8px;border-bottom:2px solid #ccc;}' +
         'td{padding:6px 8px;border-bottom:1px solid #ddd;}' +
       '</style></head><body>' +
-      '<h1>Barangay Chairs &amp; Tables Ledger</h1>' +
+      '<h1>JN Business Chairs &amp; Tables Ledger</h1>' +
       '<div class="sub">Report generated ' + nowDisplay() + ' &mdash; ' + list.length + ' record(s)</div>' +
-      '<table><thead><tr><th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Status</th><th>Return info</th></tr></thead>' +
+      '<table><thead><tr><th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Logged by</th><th>Status</th><th>Return info</th></tr></thead>' +
       '<tbody>' + rowsHtml + '</tbody></table>' +
       '</body></html>';
     win.document.write(html);
@@ -1003,7 +1025,7 @@
           '<div id="returnFormError" class="login-error hidden"></div>' +
           '<div class="grid2">' +
             '<div class="field"><label>Date &amp; time received</label><div class="readout">' + nowDisplay() + '</div></div>' +
-            '<div class="field"><label for="receivedBy">Received by (staff name)</label><input type="text" id="receivedBy" required></div>' +
+            '<div class="field"><label for="receivedBy">Received by (staff name)</label><input type="text" id="receivedBy" required><div class="helper">The person physically receiving the items. Your signed-in account is recorded automatically for the audit trail.</div></div>' +
           '</div>' +
           '<div class="row-actions">' +
             '<button type="submit" class="btn btn-primary" id="confirmReturnBtn">Confirm return</button>' +
@@ -1072,7 +1094,7 @@
       return;
     }
     wrap.innerHTML = '<div style="overflow-x:auto;"><table class="log"><thead><tr>' +
-      '<th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Status</th><th>Return info</th><th></th>' +
+      '<th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Logged by</th><th>Status</th><th>Return info</th><th></th>' +
       '</tr></thead><tbody>' +
       list.map(function(r){
         return '<tr>' +
@@ -1083,8 +1105,9 @@
           '<td>' + escapeHtml(r.phone) + '</td>' +
           '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
           '<td class="mono">' + r.dateOut + '</td>' +
+          '<td class="mono">' + escapeHtml(r.createdBy) + '</td>' +
           '<td><span class="badge ' + (r.status === 'out' ? 'out' : 'returned') + '">' + (r.status === 'out' ? 'Still out' : 'Returned') + '</span></td>' +
-          '<td>' + (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) : '&mdash;') + '</td>' +
+          '<td>' + (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) + '<br><span class="mono">(' + escapeHtml(r.returnedByAccount) + ')</span>' : '&mdash;') + '</td>' +
           '<td><button class="btn btn-danger btn-sm" data-delete="' + r.id + '">Delete</button></td>' +
         '</tr>';
       }).join('') +
@@ -1110,9 +1133,9 @@
   // ---------- CSV Export ----------
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
     var list = filteredRecords();
-    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Status','Date Returned','Received By'];
+    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Logged By','Status','Date Returned','Received By','Confirmed By Account'];
     var rows = list.map(function(r){
-      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '']
+      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.createdBy || '', r.status, r.dateReturned || '', r.receivedBy || '', r.returnedByAccount || '']
         .map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
     });
     var csv = header.join(',') + '\n' + rows.join('\n');
@@ -1120,7 +1143,7 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'barangay-ledger-export.csv';
+    a.download = 'jn-business-ledger-export.csv';
     a.click();
     URL.revokeObjectURL(url);
   });
