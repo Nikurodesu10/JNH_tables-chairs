@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Barangay Chairs &amp; Tables Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --ink:#1F2A24;
+    --paper:#F6F2E7;
+    --paper-2:#EFE9D8;
+    --forest:#1B4332;
+    --forest-2:#2D6A4F;
+    --brass:#A97D3A;
+    --brass-2:#C9A66B;
+    --line:#D8CFB8;
+    --white:#FFFFFF;
+    --red:#9B3B3B;
+    --shadow: 0 8px 24px -12px rgba(27,67,50,0.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(27,67,50,0.03) 0px, rgba(27,67,50,0.03) 1px, transparent 1px, transparent 28px);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;}
+  .hidden{display:none !important;}
+
+  /* ---------- LOGIN ---------- */
+  #loginScreen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .login-card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:4px;
+    box-shadow:var(--shadow);
+    width:100%;
+    max-width:400px;
+    padding:36px 32px 28px;
+    position:relative;
+    overflow:hidden;
+  }
+  .login-card::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:6px;
+    background:linear-gradient(90deg,var(--forest),var(--brass));
+  }
+  .login-eyebrow{
+    text-transform:uppercase;
+    letter-spacing:0.14em;
+    font-size:11px;
+    color:var(--brass);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .login-card h1{
+    font-size:26px;
+    margin:0 0 4px;
+    color:var(--forest);
+    line-height:1.15;
+  }
+  .login-sub{
+    font-size:13px;
+    color:#6b7268;
+    margin:0 0 22px;
+  }
+  .field{margin-bottom:16px;}
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--forest);
+    margin-bottom:6px;
+    letter-spacing:0.01em;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    background:#FCFAF4;
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:2px solid var(--brass-2);
+    outline-offset:1px;
+    background:var(--white);
+  }
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    border:none;
+    border-radius:3px;
+    padding:12px 18px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:0.55; cursor:not-allowed;}
+  .btn-primary{background:var(--forest); color:var(--white);}
+  .btn-primary:hover{background:var(--forest-2);}
+  .btn-brass{background:var(--brass); color:var(--white);}
+  .btn-brass:hover{background:var(--brass-2);}
+  .btn-ghost{background:transparent; color:var(--forest); border:1px solid var(--line);}
+  .btn-ghost:hover{background:var(--paper-2);}
+  .btn-danger{background:transparent; color:var(--red); border:1px solid #e0c8c8;}
+  .btn-block{width:100%;}
+  .btn-sm{font-size:11px;padding:6px 10px;}
+  .login-error{
+    background:#FBEAEA; color:var(--red); border:1px solid #E7C2C2;
+    padding:9px 12px; border-radius:3px; font-size:13px; margin-bottom:14px;
+  }
+  .setup-notice{
+    background:#FCF3E3; color:#7A5A20; border:1px solid var(--brass-2);
+    padding:12px 14px; border-radius:3px; font-size:12.5px; margin-bottom:16px; line-height:1.5;
+  }
+
+  /* ---------- APP SHELL ---------- */
+  header.top{
+    background:var(--forest);
+    color:var(--paper);
+    padding:18px 20px 0;
+    position:sticky; top:0; z-index:20;
+    box-shadow:0 4px 14px -6px rgba(0,0,0,0.35);
+  }
+  .top-row{
+    display:flex; align-items:center; justify-content:space-between;
+    max-width:1100px; margin:0 auto; flex-wrap:wrap; gap:10px;
+    padding-bottom:14px;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:34px; height:34px; border-radius:50%;
+    background:var(--brass);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--forest); font-family:'Fraunces',serif; font-weight:700; font-size:15px;
+  }
+  .brand h1{font-size:18px; margin:0; color:var(--white); letter-spacing:0.01em;}
+  .brand span{display:block; font-size:11px; color:var(--brass-2); letter-spacing:0.08em; text-transform:uppercase; margin-top:1px;}
+  .logout-link{
+    font-size:12px; color:var(--paper); opacity:0.8; text-decoration:none;
+    border:1px solid rgba(255,255,255,0.3); padding:7px 12px; border-radius:3px;
+    background:transparent; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .logout-link:hover{opacity:1; background:rgba(255,255,255,0.08);}
+
+  nav.tabs{
+    max-width:1100px; margin:0 auto;
+    display:flex; gap:4px; overflow-x:auto;
+  }
+  nav.tabs button{
+    background:var(--paper-2);
+    color:var(--forest);
+    border:none;
+    padding:10px 18px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    border-radius:6px 6px 0 0;
+    cursor:pointer;
+    white-space:nowrap;
+    opacity:0.65;
+    transform:translateY(2px);
+  }
+  nav.tabs button.active{
+    background:var(--paper);
+    opacity:1;
+    transform:translateY(0);
+  }
+
+  #dbErrorBanner{
+    max-width:1100px; margin:14px auto 0; padding:10px 14px;
+    background:#FBEAEA; color:var(--red); border:1px solid #E7C2C2; border-radius:3px;
+    font-size:13px; display:flex; justify-content:space-between; gap:10px; align-items:center;
+  }
+  #dbErrorBanner button{background:none;border:none;color:var(--red);font-weight:700;cursor:pointer;font-size:14px;}
+
+  main{
+    max-width:1100px; margin:0 auto; padding:26px 20px 60px;
+  }
+  .view{animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  .panel{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:26px;
+    box-shadow:var(--shadow);
+    margin-bottom:22px;
+  }
+  .panel h2{
+    color:var(--forest); font-size:20px; margin:0 0 4px;
+  }
+  .panel .sub{color:#6b7268; font-size:13px; margin:0 0 22px;}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:640px){.grid2{grid-template-columns:1fr;}}
+
+  fieldset{
+    border:1px solid var(--line); border-radius:3px; padding:14px 16px 16px;
+    margin:0 0 18px;
+  }
+  fieldset legend{
+    font-size:12px; font-weight:700; color:var(--brass); text-transform:uppercase;
+    letter-spacing:0.08em; padding:0 6px;
+  }
+  .option-row{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:8px 0; border-bottom:1px dashed var(--line);
+  }
+  .option-row:last-child{border-bottom:none;}
+  .option-row label.opt{
+    display:flex; align-items:center; gap:8px; font-size:14px; font-weight:500;
+    min-width:140px; cursor:pointer;
+  }
+  .option-row input[type=checkbox]{width:17px; height:17px; accent-color:var(--forest);}
+  .option-row input[type=number]{width:80px; padding:7px 8px;}
+  .option-row input[type=text]{flex:1; min-width:140px; padding:7px 8px;}
+
+  .readout{
+    background:var(--paper-2); border:1px solid var(--line); border-radius:3px;
+    padding:10px 12px; font-size:13px; color:var(--forest); font-weight:600;
+  }
+
+  /* Receipt stub - signature element */
+  .stub{
+    margin-top:20px;
+    background:#FFFDF7;
+    border:1px solid var(--brass-2);
+    border-radius:4px;
+    position:relative;
+    padding:22px 24px;
+  }
+  .stub::before, .stub::after{
+    content:"";
+    position:absolute; left:0; right:0; height:14px;
+    background-image: radial-gradient(circle, var(--paper) 5px, transparent 5.5px);
+    background-size:18px 18px;
+    background-position:left center;
+  }
+  .stub::before{top:-7px;}
+  .stub::after{bottom:-7px;}
+  .stub-head{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    border-bottom:1px dashed var(--brass-2); padding-bottom:12px; margin-bottom:12px;
+  }
+  .stub-id{font-size:20px; color:var(--forest); font-weight:700;}
+  .stamp{
+    border:2px solid var(--red); color:var(--red);
+    padding:4px 10px; border-radius:3px; font-size:11px; font-weight:700;
+    letter-spacing:0.1em; text-transform:uppercase; transform:rotate(-6deg);
+  }
+  .stamp.out{border-color:var(--brass); color:var(--brass);}
+  .stub dl{display:grid; grid-template-columns:120px 1fr; gap:6px 10px; font-size:13px; margin:0 0 14px;}
+  .stub dt{color:#6b7268; font-weight:600;}
+  .stub dd{margin:0;}
+
+  /* Records/search cards */
+  .rec-card{
+    border:1px solid var(--line); border-radius:4px; padding:16px 18px; margin-bottom:12px;
+    background:var(--white);
+  }
+  .rec-top{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;}
+  .badge{
+    font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;
+    padding:3px 9px; border-radius:20px;
+  }
+  .badge.rent{background:#E4EEE8; color:var(--forest);}
+  .badge.borrow{background:#F1E6D2; color:var(--brass);}
+  .badge.out{background:#FBEAEA; color:var(--red);}
+  .badge.returned{background:#E4EEE8; color:var(--forest-2);}
+  .rec-name{font-weight:700; font-size:15px; margin:4px 0 2px;}
+  .rec-meta{font-size:12px; color:#6b7268;}
+  .rec-items{font-size:13px; margin-top:8px; color:var(--ink);}
+
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; align-items:center;}
+  .toolbar input, .toolbar select{
+    padding:9px 12px; border:1px solid var(--line); border-radius:3px; font-size:13px;
+    font-family:'Inter',sans-serif; background:#FCFAF4;
+  }
+  .toolbar input[type=text]{flex:1; min-width:180px;}
+
+  table.log{width:100%; border-collapse:collapse; font-size:12.5px;}
+  table.log th{
+    text-align:left; background:var(--paper-2); color:var(--forest);
+    padding:9px 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;
+    border-bottom:2px solid var(--line);
+  }
+  table.log td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top;}
+  table.log tr:hover td{background:#FBF9F2;}
+  .empty-state{
+    text-align:center; padding:40px 20px; color:#8a8f84;
+  }
+  .empty-state .display{font-size:18px; color:var(--forest); margin-bottom:6px;}
+
+  .helper{font-size:12px; color:#8a8f84; margin-top:4px;}
+  .row-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .footnote{
+    max-width:1100px; margin:0 auto; padding:0 20px 40px; font-size:12px; color:#8a8f84;
+  }
+
+  @media print{
+    header.top, .toolbar, .footnote, #dbErrorBanner, nav.tabs, form, .row-actions{display:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-eyebrow">Barangay Property Desk</div>
+    <h1>Chairs &amp; Tables Ledger</h1>
+    <p class="login-sub">Sign in to record rentals and borrowings.</p>
+    <div id="setupNotice" class="setup-notice hidden">
+      This app isn't connected to a database yet. Open <span class="mono">index.html</span>, find the <span class="mono">SUPABASE_URL</span> and <span class="mono">SUPABASE_ANON_KEY</span> lines near the top of the script, and paste in your project's values. See the setup guide provided alongside this file.
+    </div>
+    <div id="loginError" class="login-error hidden">Incorrect username or password. Try again.</div>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginUser">Username</label>
+        <input type="text" id="loginUser" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="loginPass">Password</label>
+        <input type="password" id="loginPass" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <div class="brand-mark">B</div>
+        <div>
+          <h1>Chairs &amp; Tables Ledger</h1>
+          <span>Rent &amp; Barrow Records</span>
+        </div>
+      </div>
+      <button class="logout-link" id="logoutBtn">Sign out</button>
+    </div>
+    <nav class="tabs">
+      <button data-view="newRent" class="active">New Rent</button>
+      <button data-view="newBorrow">New Barrow</button>
+      <button data-view="returns">Process Return</button>
+      <button data-view="records">All Records</button>
+    </nav>
+  </header>
+
+  <div id="dbErrorBanner" class="hidden">
+    <span id="dbErrorText"></span>
+    <button id="dbErrorClose" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <main>
+
+    <!-- ---------------- NEW RENT ---------------- -->
+    <section id="view-newRent" class="view">
+      <div class="panel">
+        <h2>New Rent Record</h2>
+        <p class="sub">Chairs come in yellow or white. Tables come in round, long, steel, or wood.</p>
+        <form id="rentForm">
+          <div class="grid2">
+            <div class="field">
+              <label for="rentName">Full name</label>
+              <input type="text" id="rentName" required>
+            </div>
+            <div class="field">
+              <label>Date &amp; time filed</label>
+              <div class="readout" id="rentNow">--</div>
+            </div>
+            <div class="field">
+              <label for="rentBarangay">Barangay</label>
+              <input type="text" id="rentBarangay" required>
+            </div>
+            <div class="field">
+              <label for="rentPhone">Phone number</label>
+              <input type="tel" id="rentPhone" placeholder="09XX XXX XXXX" required>
+            </div>
+          </div>
+
+          <fieldset>
+            <legend>Chairs</legend>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-chair" value="Yellow"> Yellow chair</label>
+              <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="Yellow" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-chair" value="White"> White chair</label>
+              <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="White" disabled>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Tables</legend>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-table" value="Round"> Round table</label>
+              <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Round" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-table" value="Long"> Long table</label>
+              <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Long" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-table" value="Steel"> Steel table</label>
+              <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Steel" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-table" value="Wood"> Wood table</label>
+              <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Wood" disabled>
+            </div>
+          </fieldset>
+
+          <div id="rentFormError" class="login-error hidden">Please add the name, barangay, phone number, and at least one item with a quantity.</div>
+          <button type="submit" class="btn btn-primary" id="rentSubmitBtn">Save rent record</button>
+        </form>
+        <div id="rentStub"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- NEW BORROW ---------------- -->
+    <section id="view-newBorrow" class="view hidden">
+      <div class="panel">
+        <h2>New Barrow Record</h2>
+        <p class="sub">Chairs for barrow are white only. Tables come in wood, steel, or other.</p>
+        <form id="borrowForm">
+          <div class="grid2">
+            <div class="field">
+              <label for="borrowName">Full name</label>
+              <input type="text" id="borrowName" required>
+            </div>
+            <div class="field">
+              <label>Date &amp; time filed</label>
+              <div class="readout" id="borrowNow">--</div>
+            </div>
+            <div class="field">
+              <label for="borrowBarangay">Barangay</label>
+              <input type="text" id="borrowBarangay" required>
+            </div>
+            <div class="field">
+              <label for="borrowPhone">Phone number</label>
+              <input type="tel" id="borrowPhone" placeholder="09XX XXX XXXX" required>
+            </div>
+          </div>
+
+          <fieldset>
+            <legend>Chairs</legend>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="borrow-chair" value="White"> White chair</label>
+              <input type="number" min="0" placeholder="Qty" class="borrow-chair-qty" data-for="White" disabled>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Tables</legend>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="borrow-table" value="Wood"> Wood table</label>
+              <input type="number" min="0" placeholder="Qty" class="borrow-table-qty" data-for="Wood" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="borrow-table" value="Steel"> Steel table</label>
+              <input type="number" min="0" placeholder="Qty" class="borrow-table-qty" data-for="Steel" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="borrow-table" value="Other"> Other</label>
+              <input type="number" min="0" placeholder="Qty" class="borrow-table-qty" data-for="Other" disabled>
+              <input type="text" id="borrowOtherNote" placeholder="Specify other table..." disabled>
+            </div>
+          </fieldset>
+
+          <div id="borrowFormError" class="login-error hidden">Please add the name, barangay, phone number, and at least one item with a quantity.</div>
+          <button type="submit" class="btn btn-primary" id="borrowSubmitBtn">Save barrow record</button>
+        </form>
+        <div id="borrowStub"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- RETURNS ---------------- -->
+    <section id="view-returns" class="view hidden">
+      <div class="panel">
+        <h2>Process a Return</h2>
+        <p class="sub">Search the name of the person who rented or borrowed to bring up their checklist.</p>
+        <div class="toolbar">
+          <input type="text" id="returnSearch" placeholder="Type a name to search...">
+          <button class="btn btn-ghost btn-sm" id="refreshReturnsBtn">&#8635; Refresh</button>
+        </div>
+        <div id="returnResults"></div>
+      </div>
+      <div id="returnChecklistWrap"></div>
+    </section>
+
+    <!-- ---------------- ALL RECORDS ---------------- -->
+    <section id="view-records" class="view hidden">
+      <div class="panel">
+        <h2>All Records</h2>
+        <p class="sub">Every rent and barrow entry, whether still out or already returned.</p>
+        <div class="toolbar">
+          <input type="text" id="logSearch" placeholder="Search by name, barangay, or phone...">
+          <select id="logTypeFilter">
+            <option value="all">All types</option>
+            <option value="rent">Rent only</option>
+            <option value="borrow">Barrow only</option>
+          </select>
+          <select id="logStatusFilter">
+            <option value="all">All statuses</option>
+            <option value="out">Still out</option>
+            <option value="returned">Returned</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" id="refreshLogBtn">&#8635; Refresh</button>
+          <button class="btn btn-ghost btn-sm" id="printLogBtn">Print / Save PDF</button>
+          <button class="btn btn-ghost btn-sm" id="exportCsvBtn">Export CSV</button>
+        </div>
+        <div id="logTableWrap"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <p class="footnote">Records are stored in a shared online database, so every device signed in sees the same ledger. Use "Export CSV" or "Print / Save PDF" any time you want an offline copy.</p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // =========================================================
+  // CONFIG — paste your Supabase project values here
+  // (Project Settings -> API in your Supabase dashboard)
+  // =========================================================
+  var SUPABASE_URL = "YOUR_SUPABASE_URL";
+  var SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  // =========================================================
+
+  var USERNAME = "hofilena01";
+  var PASSWORD = "12345JN";
+
+  var CONFIGURED = SUPABASE_URL.indexOf('YOUR_') !== 0 && SUPABASE_ANON_KEY.indexOf('YOUR_') !== 0;
+  var db = null;
+  if (CONFIGURED && window.supabase){
+    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+
+  var state = { records: [] };
+
+  // ---------- Utilities ----------
+  function nowDisplay(){
+    var d = new Date();
+    return d.toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'}) +
+      ', ' + d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  }
+  function formatDate(iso){
+    if (!iso) return null;
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'}) +
+      ', ' + d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  }
+  function escapeHtml(str){
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function itemsSummary(rec){
+    var parts = [];
+    (rec.chairs||[]).forEach(function(c){ parts.push(c.qty + ' ' + c.type + ' chair' + (c.qty>1?'s':'')); });
+    (rec.tables||[]).forEach(function(t){
+      var label = t.type === 'Other' && t.note ? 'Other (' + t.note + ')' : t.type;
+      parts.push(t.qty + ' ' + label + ' table' + (t.qty>1?'s':''));
+    });
+    return parts.length ? parts.join(', ') : 'No items recorded';
+  }
+
+  function showDbError(msg){
+    var banner = document.getElementById('dbErrorBanner');
+    document.getElementById('dbErrorText').textContent = msg;
+    banner.classList.remove('hidden');
+  }
+  document.getElementById('dbErrorClose').addEventListener('click', function(){
+    document.getElementById('dbErrorBanner').classList.add('hidden');
+  });
+
+  function mapRow(row){
+    return {
+      id: row.record_no,
+      type: row.type,
+      name: row.name,
+      barangay: row.barangay,
+      phone: row.phone,
+      chairs: row.chairs || [],
+      tables: row.tables || [],
+      dateOut: formatDate(row.date_out),
+      dateOutISO: row.date_out,
+      status: row.status,
+      dateReturned: row.date_returned ? formatDate(row.date_returned) : null,
+      receivedBy: row.received_by
+    };
+  }
+
+  // ---------- Database access ----------
+  async function fetchRecordsFromDB(){
+    if (!db) return [];
+    var res = await db.from('records').select('*').order('date_out', { ascending: false });
+    if (res.error) throw res.error;
+    return (res.data || []).map(mapRow);
+  }
+  async function insertRecordToDB(payload){
+    var res = await db.from('records').insert([payload]).select().single();
+    if (res.error) throw res.error;
+    return mapRow(res.data);
+  }
+  async function updateRecordInDB(recordNo, patch){
+    var res = await db.from('records').update(patch).eq('record_no', recordNo).select().single();
+    if (res.error) throw res.error;
+    return mapRow(res.data);
+  }
+  async function deleteRecordFromDB(recordNo){
+    var res = await db.from('records').delete().eq('record_no', recordNo);
+    if (res.error) throw res.error;
+  }
+  async function refreshRecords(){
+    try{
+      state.records = await fetchRecordsFromDB();
+    }catch(e){
+      showDbError('Could not load records from the database: ' + (e.message || e));
+    }
+  }
+
+  // ---------- Login ----------
+  var loginForm = document.getElementById('loginForm');
+  var loginScreen = document.getElementById('loginScreen');
+  var app = document.getElementById('app');
+  var loginError = document.getElementById('loginError');
+
+  if (!CONFIGURED){
+    document.getElementById('setupNotice').classList.remove('hidden');
+  }
+
+  async function enterApp(){
+    loginScreen.classList.add('hidden');
+    app.classList.remove('hidden');
+    document.getElementById('logTableWrap').innerHTML = '<div class="empty-state">Loading records&hellip;</div>';
+    await refreshRecords();
+    renderAll();
+  }
+
+  async function checkSession(){
+    if (sessionStorage.getItem('brgy_logged_in') === '1'){
+      await enterApp();
+    }
+  }
+
+  loginForm.addEventListener('submit', async function(e){
+    e.preventDefault();
+    var u = document.getElementById('loginUser').value.trim();
+    var p = document.getElementById('loginPass').value;
+    if (u === USERNAME && p === PASSWORD){
+      sessionStorage.setItem('brgy_logged_in', '1');
+      loginError.classList.add('hidden');
+      await enterApp();
+    } else {
+      loginError.classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', function(){
+    sessionStorage.removeItem('brgy_logged_in');
+    app.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    loginForm.reset();
+  });
+
+  // ---------- Tabs ----------
+  var tabButtons = document.querySelectorAll('nav.tabs button');
+  tabButtons.forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      tabButtons.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('main .view').forEach(function(v){ v.classList.add('hidden'); });
+      document.getElementById('view-' + btn.dataset.view).classList.remove('hidden');
+      if (btn.dataset.view === 'records'){
+        document.getElementById('logTableWrap').innerHTML = '<div class="empty-state">Loading records&hellip;</div>';
+        await refreshRecords();
+        renderLogTable();
+      }
+      if (btn.dataset.view === 'returns'){
+        document.getElementById('returnResults').innerHTML = '<div class="empty-state">Loading records&hellip;</div>';
+        await refreshRecords();
+        renderReturnResults(document.getElementById('returnSearch').value.trim().toLowerCase());
+      }
+    });
+  });
+
+  document.getElementById('refreshLogBtn').addEventListener('click', async function(){
+    document.getElementById('logTableWrap').innerHTML = '<div class="empty-state">Loading records&hellip;</div>';
+    await refreshRecords();
+    renderLogTable();
+  });
+  document.getElementById('refreshReturnsBtn').addEventListener('click', async function(){
+    document.getElementById('returnResults').innerHTML = '<div class="empty-state">Loading records&hellip;</div>';
+    await refreshRecords();
+    renderReturnResults(document.getElementById('returnSearch').value.trim().toLowerCase());
+  });
+
+  // ---------- Checkbox <-> qty enabling (generic) ----------
+  function wireCheckboxQty(checkboxSelector, qtyClassPrefix){
+    document.querySelectorAll(checkboxSelector).forEach(function(cb){
+      cb.addEventListener('change', function(){
+        var qtyInput = document.querySelector('.' + qtyClassPrefix + '[data-for="' + cb.value + '"]');
+        if (qtyInput){
+          qtyInput.disabled = !cb.checked;
+          if (cb.checked && !qtyInput.value) qtyInput.value = 1;
+          if (!cb.checked) qtyInput.value = '';
+        }
+        if (cb.value === 'Other'){
+          var note = document.getElementById('borrowOtherNote');
+          if (note) note.disabled = !cb.checked;
+        }
+      });
+    });
+  }
+  wireCheckboxQty('.rent-chair', 'rent-chair-qty');
+  wireCheckboxQty('.rent-table', 'rent-table-qty');
+  wireCheckboxQty('.borrow-chair', 'borrow-chair-qty');
+  wireCheckboxQty('.borrow-table', 'borrow-table-qty');
+
+  function collectItems(checkboxClass, qtyClass, includeNote){
+    var out = [];
+    document.querySelectorAll('.' + checkboxClass).forEach(function(cb){
+      if (!cb.checked) return;
+      var qtyInput = document.querySelector('.' + qtyClass + '[data-for="' + cb.value + '"]');
+      var qty = parseInt(qtyInput && qtyInput.value, 10) || 0;
+      if (qty <= 0) return;
+      var entry = { type: cb.value, qty: qty };
+      if (includeNote && cb.value === 'Other'){
+        entry.note = (document.getElementById('borrowOtherNote').value || '').trim();
+      }
+      out.push(entry);
+    });
+    return out;
+  }
+
+  // ---------- Rent form ----------
+  var rentForm = document.getElementById('rentForm');
+  document.getElementById('rentNow').textContent = nowDisplay();
+
+  rentForm.addEventListener('submit', async function(e){
+    e.preventDefault();
+    var name = document.getElementById('rentName').value.trim();
+    var barangay = document.getElementById('rentBarangay').value.trim();
+    var phone = document.getElementById('rentPhone').value.trim();
+    var chairs = collectItems('rent-chair', 'rent-chair-qty', false);
+    var tables = collectItems('rent-table', 'rent-table-qty', false);
+    var errBox = document.getElementById('rentFormError');
+
+    if (!name || !barangay || !phone || (chairs.length === 0 && tables.length === 0)){
+      errBox.textContent = 'Please add the name, barangay, phone number, and at least one item with a quantity.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+    errBox.classList.add('hidden');
+
+    var btn = document.getElementById('rentSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try{
+      var rec = await insertRecordToDB({
+        type: 'rent', name: name, barangay: barangay, phone: phone,
+        chairs: chairs, tables: tables
+      });
+      state.records.unshift(rec);
+      renderStub('rentStub', rec, 'out');
+      rentForm.reset();
+      document.querySelectorAll('.rent-chair-qty, .rent-table-qty').forEach(function(i){ i.disabled = true; i.value=''; });
+      document.getElementById('rentNow').textContent = nowDisplay();
+    }catch(err){
+      errBox.textContent = 'Could not save: ' + (err.message || err);
+      errBox.classList.remove('hidden');
+    }
+    btn.disabled = false; btn.textContent = 'Save rent record';
+  });
+
+  // ---------- Borrow form ----------
+  var borrowForm = document.getElementById('borrowForm');
+  document.getElementById('borrowNow').textContent = nowDisplay();
+
+  borrowForm.addEventListener('submit', async function(e){
+    e.preventDefault();
+    var name = document.getElementById('borrowName').value.trim();
+    var barangay = document.getElementById('borrowBarangay').value.trim();
+    var phone = document.getElementById('borrowPhone').value.trim();
+    var chairs = collectItems('borrow-chair', 'borrow-chair-qty', false);
+    var tables = collectItems('borrow-table', 'borrow-table-qty', true);
+    var errBox = document.getElementById('borrowFormError');
+
+    if (!name || !barangay || !phone || (chairs.length === 0 && tables.length === 0)){
+      errBox.textContent = 'Please add the name, barangay, phone number, and at least one item with a quantity.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+    errBox.classList.add('hidden');
+
+    var btn = document.getElementById('borrowSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try{
+      var rec = await insertRecordToDB({
+        type: 'borrow', name: name, barangay: barangay, phone: phone,
+        chairs: chairs, tables: tables
+      });
+      state.records.unshift(rec);
+      renderStub('borrowStub', rec, 'out');
+      borrowForm.reset();
+      document.querySelectorAll('.borrow-chair-qty, .borrow-table-qty').forEach(function(i){ i.disabled = true; i.value=''; });
+      document.getElementById('borrowOtherNote').disabled = true;
+      document.getElementById('borrowNow').textContent = nowDisplay();
+    }catch(err){
+      errBox.textContent = 'Could not save: ' + (err.message || err);
+      errBox.classList.remove('hidden');
+    }
+    btn.disabled = false; btn.textContent = 'Save barrow record';
+  });
+
+  function renderStub(wrapId, rec, mode){
+    var wrap = document.getElementById(wrapId);
+    var isOut = mode === 'out';
+    wrap.innerHTML =
+      '<div class="stub">' +
+        '<div class="stub-head">' +
+          '<div><div class="stub-id mono">' + rec.id + '</div>' +
+          '<div class="helper">' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' record</div></div>' +
+          '<div class="stamp ' + (isOut ? 'out' : '') + '">' + (isOut ? 'Recorded' : 'Returned') + '</div>' +
+        '</div>' +
+        '<dl>' +
+          '<dt>Name</dt><dd>' + escapeHtml(rec.name) + '</dd>' +
+          '<dt>Barangay</dt><dd>' + escapeHtml(rec.barangay) + '</dd>' +
+          '<dt>Phone</dt><dd>' + escapeHtml(rec.phone) + '</dd>' +
+          '<dt>Date out</dt><dd class="mono">' + rec.dateOut + '</dd>' +
+          '<dt>Items</dt><dd>' + escapeHtml(itemsSummary(rec)) + '</dd>' +
+          (!isOut ? '<dt>Date returned</dt><dd class="mono">' + rec.dateReturned + '</dd><dt>Received by</dt><dd>' + escapeHtml(rec.receivedBy) + '</dd>' : '') +
+        '</dl>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-print-stub="1">Print / Save PDF</button>' +
+      '</div>';
+    wrap.querySelector('[data-print-stub]').addEventListener('click', function(){
+      printReceipt(rec, mode);
+    });
+  }
+
+  // ---------- Print helpers ----------
+  function printReceipt(rec, mode){
+    var isOut = mode === 'out';
+    var win = window.open('', '_blank', 'width=440,height=680');
+    if (!win){ alert('Please allow pop-ups for this site to print.'); return; }
+    function row(label, value){ return '<tr><td class="label">' + label + '</td><td>' + escapeHtml(value) + '</td></tr>'; }
+    var html = '<!DOCTYPE html><html><head><title>' + rec.id + '</title><meta charset="utf-8">' +
+      '<style>' +
+        'body{font-family: Georgia, serif; padding:28px; color:#1F2A24;}' +
+        'h1{font-size:19px;margin:0 0 2px;}' +
+        '.sub{font-size:12px;color:#666;margin-bottom:18px;}' +
+        'table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}' +
+        'td{padding:7px 0;border-bottom:1px dashed #ccc;vertical-align:top;}' +
+        'td.label{color:#666;width:130px;}' +
+        '.stamp{display:inline-block;border:2px solid ' + (isOut ? '#A97D3A' : '#1B4332') + '; color:' + (isOut ? '#A97D3A' : '#1B4332') + '; padding:4px 12px;border-radius:4px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:16px;}' +
+      '</style></head><body>' +
+      '<div class="sub">Barangay Chairs &amp; Tables Ledger</div>' +
+      '<h1>' + rec.id + ' &mdash; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' Record</h1>' +
+      '<div class="stamp">' + (isOut ? 'Recorded' : 'Returned') + '</div>' +
+      '<table>' +
+        row('Name', rec.name) + row('Barangay', rec.barangay) + row('Phone', rec.phone) +
+        row('Date out', rec.dateOut) + row('Items', itemsSummary(rec)) +
+        (!isOut ? row('Date returned', rec.dateReturned) + row('Received by', rec.receivedBy) : '') +
+      '</table>' +
+      '</body></html>';
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function(){ win.print(); }, 300);
+  }
+
+  function printLog(){
+    var list = filteredRecords();
+    var win = window.open('', '_blank', 'width=900,height=700');
+    if (!win){ alert('Please allow pop-ups for this site to print.'); return; }
+    var rowsHtml = list.map(function(r){
+      return '<tr>' +
+        '<td>' + r.id + '</td>' +
+        '<td>' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</td>' +
+        '<td>' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.barangay) + '</td>' +
+        '<td>' + escapeHtml(r.phone) + '</td>' +
+        '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
+        '<td>' + r.dateOut + '</td>' +
+        '<td>' + (r.status === 'out' ? 'Still out' : 'Returned') + '</td>' +
+        '<td>' + (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) : '&mdash;') + '</td>' +
+      '</tr>';
+    }).join('');
+    var html = '<!DOCTYPE html><html><head><title>Barangay Ledger Report</title><meta charset="utf-8">' +
+      '<style>' +
+        'body{font-family: Georgia, serif; padding:24px; color:#1F2A24;}' +
+        'h1{font-size:18px;margin:0 0 2px;}' +
+        '.sub{font-size:12px;color:#666;margin-bottom:16px;}' +
+        'table{width:100%;border-collapse:collapse;font-size:11.5px;}' +
+        'th{background:#EFE9D8;text-align:left;padding:6px 8px;border-bottom:2px solid #ccc;}' +
+        'td{padding:6px 8px;border-bottom:1px solid #ddd;}' +
+      '</style></head><body>' +
+      '<h1>Barangay Chairs &amp; Tables Ledger</h1>' +
+      '<div class="sub">Report generated ' + nowDisplay() + ' &mdash; ' + list.length + ' record(s)</div>' +
+      '<table><thead><tr><th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Status</th><th>Return info</th></tr></thead>' +
+      '<tbody>' + rowsHtml + '</tbody></table>' +
+      '</body></html>';
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function(){ win.print(); }, 300);
+  }
+  document.getElementById('printLogBtn').addEventListener('click', printLog);
+
+  // ---------- Returns ----------
+  var returnSearch = document.getElementById('returnSearch');
+  returnSearch.addEventListener('input', function(){
+    renderReturnResults(returnSearch.value.trim().toLowerCase());
+  });
+
+  function renderReturnResults(query){
+    var wrap = document.getElementById('returnResults');
+    var all = state.records.filter(function(r){ return r.status === 'out'; });
+    var matches = query ? all.filter(function(r){ return r.name.toLowerCase().indexOf(query) !== -1; }) : all;
+
+    if (matches.length === 0){
+      wrap.innerHTML = '<div class="empty-state"><div class="display">' +
+        (query ? 'No matching name found among items still out.' : 'No items are currently out.') +
+        '</div><p class="helper">Try a different spelling, or check the All Records tab.</p></div>';
+      return;
+    }
+
+    wrap.innerHTML = matches.map(function(r){
+      return '<div class="rec-card">' +
+        '<div class="rec-top">' +
+          '<div>' +
+            '<span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span>' +
+            '<div class="rec-name">' + escapeHtml(r.name) + '</div>' +
+            '<div class="rec-meta">' + escapeHtml(r.barangay) + ' &middot; ' + escapeHtml(r.phone) + ' &middot; <span class="mono">' + r.id + '</span></div>' +
+          '</div>' +
+          '<button class="btn btn-brass" data-open-return="' + r.id + '">Process return</button>' +
+        '</div>' +
+        '<div class="rec-items">Out since <span class="mono">' + r.dateOut + '</span>: ' + escapeHtml(itemsSummary(r)) + '</div>' +
+      '</div>';
+    }).join('');
+
+    wrap.querySelectorAll('[data-open-return]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        openReturnChecklist(btn.getAttribute('data-open-return'));
+      });
+    });
+  }
+
+  function openReturnChecklist(id){
+    var rec = state.records.find(function(r){ return r.id === id; });
+    if (!rec) return;
+    var wrap = document.getElementById('returnChecklistWrap');
+
+    var checklistRows = [];
+    (rec.chairs||[]).forEach(function(c){ checklistRows.push(c.qty + ' &times; ' + c.type + ' chair'); });
+    (rec.tables||[]).forEach(function(t){
+      var label = t.type === 'Other' && t.note ? 'Other table (' + escapeHtml(t.note) + ')' : t.type + ' table';
+      checklistRows.push(t.qty + ' &times; ' + label);
+    });
+
+    wrap.innerHTML =
+      '<div class="panel">' +
+        '<h2>Checklist for ' + escapeHtml(rec.name) + '</h2>' +
+        '<p class="sub"><span class="mono">' + rec.id + '</span> &middot; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' &middot; out since ' + rec.dateOut + '</p>' +
+        '<fieldset><legend>Items to check in</legend>' +
+          checklistRows.map(function(row){
+            return '<div class="option-row"><label class="opt"><input type="checkbox" checked disabled> ' + row + '</label></div>';
+          }).join('') +
+        '</fieldset>' +
+        '<form id="returnForm">' +
+          '<div id="returnFormError" class="login-error hidden"></div>' +
+          '<div class="grid2">' +
+            '<div class="field"><label>Date &amp; time received</label><div class="readout">' + nowDisplay() + '</div></div>' +
+            '<div class="field"><label for="receivedBy">Received by (staff name)</label><input type="text" id="receivedBy" required></div>' +
+          '</div>' +
+          '<div class="row-actions">' +
+            '<button type="submit" class="btn btn-primary" id="confirmReturnBtn">Confirm return</button>' +
+            '<button type="button" class="btn btn-ghost" id="cancelReturn">Cancel</button>' +
+          '</div>' +
+        '</form>' +
+        '<div id="returnStub"></div>' +
+      '</div>';
+
+    document.getElementById('cancelReturn').addEventListener('click', function(){
+      wrap.innerHTML = '';
+    });
+
+    document.getElementById('returnForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      var receivedBy = document.getElementById('receivedBy').value.trim();
+      if (!receivedBy) return;
+      var btn = document.getElementById('confirmReturnBtn');
+      var errBox = document.getElementById('returnFormError');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try{
+        var updated = await updateRecordInDB(id, {
+          status: 'returned',
+          date_returned: new Date().toISOString(),
+          received_by: receivedBy
+        });
+        var idx = state.records.findIndex(function(r){ return r.id === id; });
+        if (idx !== -1) state.records[idx] = updated;
+        renderStub('returnStub', updated, 'returned');
+        document.getElementById('returnForm').classList.add('hidden');
+        renderReturnResults(returnSearch.value.trim().toLowerCase());
+      }catch(err){
+        errBox.textContent = 'Could not save the return: ' + (err.message || err);
+        errBox.classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Confirm return';
+      }
+    });
+  }
+
+  // ---------- All Records / Log ----------
+  var logSearch = document.getElementById('logSearch');
+  var logTypeFilter = document.getElementById('logTypeFilter');
+  var logStatusFilter = document.getElementById('logStatusFilter');
+  [logSearch, logTypeFilter, logStatusFilter].forEach(function(el){
+    el.addEventListener('input', renderLogTable);
+    el.addEventListener('change', renderLogTable);
+  });
+
+  function filteredRecords(){
+    var q = logSearch.value.trim().toLowerCase();
+    var typeF = logTypeFilter.value;
+    var statusF = logStatusFilter.value;
+    return state.records.filter(function(r){
+      if (typeF !== 'all' && r.type !== typeF) return false;
+      if (statusF !== 'all' && r.status !== statusF) return false;
+      if (q && r.name.toLowerCase().indexOf(q) === -1 && r.barangay.toLowerCase().indexOf(q) === -1 && r.phone.toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+  }
+
+  function renderLogTable(){
+    var wrap = document.getElementById('logTableWrap');
+    var list = filteredRecords();
+    if (list.length === 0){
+      wrap.innerHTML = '<div class="empty-state"><div class="display">No records match yet.</div><p class="helper">New rent and barrow entries will show up here.</p></div>';
+      return;
+    }
+    wrap.innerHTML = '<div style="overflow-x:auto;"><table class="log"><thead><tr>' +
+      '<th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Status</th><th>Return info</th><th></th>' +
+      '</tr></thead><tbody>' +
+      list.map(function(r){
+        return '<tr>' +
+          '<td class="mono">' + r.id + '</td>' +
+          '<td><span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span></td>' +
+          '<td>' + escapeHtml(r.name) + '</td>' +
+          '<td>' + escapeHtml(r.barangay) + '</td>' +
+          '<td>' + escapeHtml(r.phone) + '</td>' +
+          '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
+          '<td class="mono">' + r.dateOut + '</td>' +
+          '<td><span class="badge ' + (r.status === 'out' ? 'out' : 'returned') + '">' + (r.status === 'out' ? 'Still out' : 'Returned') + '</span></td>' +
+          '<td>' + (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) : '&mdash;') + '</td>' +
+          '<td><button class="btn btn-danger btn-sm" data-delete="' + r.id + '">Delete</button></td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+
+    wrap.querySelectorAll('[data-delete]').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        var id = btn.getAttribute('data-delete');
+        if (!confirm('Delete record ' + id + '? This cannot be undone.')) return;
+        btn.disabled = true; btn.textContent = 'Deleting...';
+        try{
+          await deleteRecordFromDB(id);
+          state.records = state.records.filter(function(r){ return r.id !== id; });
+          renderLogTable();
+        }catch(err){
+          showDbError('Could not delete: ' + (err.message || err));
+          btn.disabled = false; btn.textContent = 'Delete';
+        }
+      });
+    });
+  }
+
+  // ---------- CSV Export ----------
+  document.getElementById('exportCsvBtn').addEventListener('click', function(){
+    var list = filteredRecords();
+    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Status','Date Returned','Received By'];
+    var rows = list.map(function(r){
+      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '']
+        .map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
+    });
+    var csv = header.join(',') + '\n' + rows.join('\n');
+    var blob = new Blob([csv], {type:'text/csv'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'barangay-ledger-export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  function renderAll(){
+    renderLogTable();
+    renderReturnResults('');
+  }
+
+  // live-updating clock previews on the two "new record" forms
+  setInterval(function(){
+    var rn = document.getElementById('rentNow');
+    var bn = document.getElementById('borrowNow');
+    if (rn) rn.textContent = nowDisplay();
+    if (bn) bn.textContent = nowDisplay();
+  }, 1000);
+
+  checkSession();
+})();
+</script>
+</body>
+</html>
