@@ -329,11 +329,8 @@
   }
 
   /* Slim, theme-matched scrollbar instead of the browser's default boxy one */
-  ::-webkit-scrollbar{width:10px; height:10px;}
-  ::-webkit-scrollbar-track{background:var(--paper);}
-  ::-webkit-scrollbar-thumb{background:var(--brass-2); border-radius:6px;}
-  ::-webkit-scrollbar-thumb:hover{background:var(--brass);}
-  html{scrollbar-width:thin; scrollbar-color:var(--brass-2) var(--paper);}
+  ::-webkit-scrollbar{display:none; width:0; height:0;}
+  html{scrollbar-width:none; -ms-overflow-style:none;}
 </style>
 </head>
 <body>
@@ -394,7 +391,7 @@
     <section id="view-newRent" class="view">
       <div class="panel">
         <h2>New Rent Record</h2>
-        <p class="sub">Chairs come in yellow or white. Tables come in round, long, steel, or wood.</p>
+        <p class="sub">Chairs come in yellow or white. Tables come in round, long, steel, or wood. Prices are shown per item.</p>
         <form id="rentForm">
           <div class="grid2">
             <div class="field">
@@ -418,36 +415,62 @@
           <fieldset>
             <legend>Chairs</legend>
             <div class="option-row">
-              <label class="opt"><input type="checkbox" class="rent-chair" value="Yellow"> Yellow chair</label>
+              <label class="opt"><input type="checkbox" class="rent-chair" value="Yellow"> Yellow chair <span class="helper">&#8369;10 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="Yellow" disabled>
             </div>
             <div class="option-row">
-              <label class="opt"><input type="checkbox" class="rent-chair" value="White"> White chair</label>
+              <label class="opt"><input type="checkbox" class="rent-chair" value="White"> White chair <span class="helper">&#8369;10 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="White" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-chair" value="Kid's Chair"> Kid's chair <span class="helper">&#8369;5 each</span></label>
+              <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="Kid's Chair" disabled>
             </div>
           </fieldset>
 
           <fieldset>
             <legend>Tables</legend>
             <div class="option-row">
-              <label class="opt"><input type="checkbox" class="rent-table" value="Round"> Round table</label>
+              <label class="opt"><input type="checkbox" class="rent-table" value="Round"> Round table <span class="helper">&#8369;100 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Round" disabled>
             </div>
             <div class="option-row">
-              <label class="opt"><input type="checkbox" class="rent-table" value="Long"> Long table</label>
+              <label class="opt"><input type="checkbox" class="rent-table" value="Long"> Long table <span class="helper">&#8369;100 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Long" disabled>
             </div>
             <div class="option-row">
-              <label class="opt"><input type="checkbox" class="rent-table" value="Steel"> Steel table</label>
+              <label class="opt"><input type="checkbox" class="rent-table" value="Steel"> Steel table <span class="helper">&#8369;50 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Steel" disabled>
             </div>
             <div class="option-row">
-              <label class="opt"><input type="checkbox" class="rent-table" value="Wood"> Wood table</label>
+              <label class="opt"><input type="checkbox" class="rent-table" value="Wood"> Wood table <span class="helper">&#8369;50 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Wood" disabled>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-table" value="Kid's Table"> Kid's table <span class="helper">&#8369;30 each</span></label>
+              <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Kid's Table" disabled>
             </div>
           </fieldset>
 
-          <div id="rentFormError" class="login-error hidden">Please add the name, barangay, phone number, and at least one item with a quantity.</div>
+          <fieldset>
+            <legend>Kid's Set</legend>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-package" value="Kid's Set"> Kid's Set <span class="helper">4 kid's chairs + 1 kid's table &middot; &#8369;50 each set</span></label>
+              <input type="number" min="0" placeholder="Qty" class="rent-package-qty" data-for="Kid's Set" disabled>
+            </div>
+          </fieldset>
+
+          <div class="field">
+            <label for="rentRemark">Remark (optional)</label>
+            <textarea id="rentRemark" rows="2" placeholder="Any notes about this rental..."></textarea>
+          </div>
+
+          <div class="field">
+            <label>Total</label>
+            <div class="readout" id="rentTotal" style="font-size:18px;">&#8369;0</div>
+          </div>
+
+          <div id="rentFormError" class="login-error hidden">Please add the name and at least one item with a quantity.</div>
           <button type="submit" class="btn btn-primary" id="rentSubmitBtn">Save rent record</button>
         </form>
         <div id="rentStub"></div>
@@ -600,6 +623,7 @@
       var label = t.type === 'Other' && t.note ? 'Other (' + t.note + ')' : t.type;
       parts.push(t.qty + ' ' + label + ' table' + (t.qty>1?'s':''));
     });
+    (rec.packages||[]).forEach(function(p){ parts.push(p.qty + ' ' + p.type + (p.qty>1?'s':'') + ' (4 chairs + 1 table each)'); });
     return parts.length ? parts.join(', ') : 'No items recorded';
   }
   function whereContact(barangay, phone){
@@ -633,11 +657,15 @@
       phone: row.phone,
       chairs: row.chairs || [],
       tables: row.tables || [],
+      packages: row.packages || [],
+      remark: row.remark || null,
+      totalPrice: (row.total_price === null || row.total_price === undefined) ? null : Number(row.total_price),
       dateOut: formatDate(row.date_out),
       dateOutISO: row.date_out,
       status: row.status,
       dateReturned: row.date_returned ? formatDate(row.date_returned) : null,
       receivedBy: row.received_by,
+      returnRemark: row.return_remark || null,
       transferredTo: row.transferred_to || null,
       transferredToRecord: row.transferred_to_record || null,
       transferDate: row.transfer_date ? formatDate(row.transfer_date) : null,
@@ -773,8 +801,34 @@
   }
   wireCheckboxQty('.rent-chair', 'rent-chair-qty');
   wireCheckboxQty('.rent-table', 'rent-table-qty');
+  wireCheckboxQty('.rent-package', 'rent-package-qty');
   wireCheckboxQty('.borrow-chair', 'borrow-chair-qty');
   wireCheckboxQty('.borrow-table', 'borrow-table-qty');
+
+  var PRICES = {
+    chair: { 'Yellow': 10, 'White': 10, "Kid's Chair": 5 },
+    table: { 'Round': 100, 'Long': 100, 'Steel': 50, 'Wood': 50, "Kid's Table": 30 },
+    package: { "Kid's Set": 50 }
+  };
+  function computeRentTotal(chairs, tables, packages){
+    var total = 0;
+    (chairs||[]).forEach(function(c){ total += (PRICES.chair[c.type] || 0) * c.qty; });
+    (tables||[]).forEach(function(t){ total += (PRICES.table[t.type] || 0) * t.qty; });
+    (packages||[]).forEach(function(p){ total += (PRICES.package[p.type] || 0) * p.qty; });
+    return total;
+  }
+  function refreshRentTotal(){
+    var chairs = collectItems('rent-chair', 'rent-chair-qty', false);
+    var tables = collectItems('rent-table', 'rent-table-qty', false);
+    var packages = collectItems('rent-package', 'rent-package-qty', false);
+    var total = computeRentTotal(chairs, tables, packages);
+    var el = document.getElementById('rentTotal');
+    if (el) el.textContent = '\u20b1' + total.toLocaleString();
+  }
+  document.querySelectorAll('.rent-chair, .rent-chair-qty, .rent-table, .rent-table-qty, .rent-package, .rent-package-qty').forEach(function(el){
+    el.addEventListener('change', refreshRentTotal);
+    el.addEventListener('input', refreshRentTotal);
+  });
 
   function collectItems(checkboxClass, qtyClass, includeNote){
     var out = [];
@@ -801,28 +855,34 @@
     var name = document.getElementById('rentName').value.trim();
     var barangay = document.getElementById('rentBarangay').value.trim();
     var phone = document.getElementById('rentPhone').value.trim();
+    var remark = document.getElementById('rentRemark').value.trim();
     var chairs = collectItems('rent-chair', 'rent-chair-qty', false);
     var tables = collectItems('rent-table', 'rent-table-qty', false);
+    var packages = collectItems('rent-package', 'rent-package-qty', false);
     var errBox = document.getElementById('rentFormError');
 
-    if (!name || (chairs.length === 0 && tables.length === 0)){
+    if (!name || (chairs.length === 0 && tables.length === 0 && packages.length === 0)){
       errBox.textContent = 'Please add the name and at least one item with a quantity.';
       errBox.classList.remove('hidden');
       return;
     }
     errBox.classList.add('hidden');
 
+    var totalPrice = computeRentTotal(chairs, tables, packages);
+
     var btn = document.getElementById('rentSubmitBtn');
     btn.disabled = true; btn.textContent = 'Saving...';
     try{
       var rec = await insertRecordToDB({
         type: 'rent', name: name, barangay: barangay, phone: phone,
-        chairs: chairs, tables: tables
+        chairs: chairs, tables: tables, packages: packages,
+        remark: remark || null, total_price: totalPrice
       });
       state.records.unshift(rec);
       renderStub('rentStub', rec, 'out');
       rentForm.reset();
-      document.querySelectorAll('.rent-chair-qty, .rent-table-qty').forEach(function(i){ i.disabled = true; i.value=''; });
+      document.querySelectorAll('.rent-chair-qty, .rent-table-qty, .rent-package-qty').forEach(function(i){ i.disabled = true; i.value=''; });
+      refreshRentTotal();
       document.getElementById('rentNow').textContent = nowDisplay();
     }catch(err){
       errBox.textContent = 'Could not save: ' + (err.message || err);
@@ -887,7 +947,9 @@
           '<dt>Phone</dt><dd>' + escapeHtml(rec.phone) + '</dd>' +
           '<dt>Date out</dt><dd class="mono">' + rec.dateOut + '</dd>' +
           '<dt>Items</dt><dd>' + escapeHtml(itemsSummary(rec)) + '</dd>' +
-          (!isOut ? '<dt>Date returned</dt><dd class="mono">' + rec.dateReturned + '</dd><dt>Received by</dt><dd>' + escapeHtml(rec.receivedBy) + '</dd>' : '') +
+          (rec.type === 'rent' && rec.totalPrice !== null ? '<dt>Total</dt><dd>\u20b1' + Number(rec.totalPrice).toLocaleString() + '</dd>' : '') +
+          (rec.remark ? '<dt>Remark</dt><dd>' + escapeHtml(rec.remark) + '</dd>' : '') +
+          (!isOut ? '<dt>Date returned</dt><dd class="mono">' + rec.dateReturned + '</dd><dt>Received by</dt><dd>' + escapeHtml(rec.receivedBy) + '</dd>' + (rec.returnRemark ? '<dt>Return remark</dt><dd>' + escapeHtml(rec.returnRemark) + '</dd>' : '') : '') +
         '</dl>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-print-stub="1">Print / Save PDF</button>' +
       '</div>';
@@ -918,7 +980,9 @@
       '<table>' +
         row('Name', rec.name) + row('Barangay', rec.barangay || '\u2014') + row('Phone', rec.phone || '\u2014') +
         row('Date out', rec.dateOut) + row('Items', itemsSummary(rec)) +
-        (!isOut ? row('Date returned', rec.dateReturned) + row('Received by', rec.receivedBy) : '') +
+        (rec.type === 'rent' && rec.totalPrice !== null ? row('Total', '\u20b1' + Number(rec.totalPrice).toLocaleString()) : '') +
+        (rec.remark ? row('Remark', rec.remark) : '') +
+        (!isOut ? row('Date returned', rec.dateReturned) + row('Received by', rec.receivedBy) + (rec.returnRemark ? row('Return remark', rec.returnRemark) : '') : '') +
       '</table>' +
       '</body></html>';
     win.document.write(html);
@@ -939,10 +1003,11 @@
         '<td>' + escapeHtml(r.barangay || '\u2014') + '</td>' +
         '<td>' + escapeHtml(r.phone || '\u2014') + '</td>' +
         '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
+        '<td>' + (r.type === 'rent' && r.totalPrice !== null ? '\u20b1' + Number(r.totalPrice).toLocaleString() : '\u2014') + '</td>' +
         '<td>' + r.dateOut + '</td>' +
         '<td>' + (r.status === 'out' ? 'Still out' : (r.status === 'transferred' ? 'Transferred' : 'Returned')) + '</td>' +
         '<td>' +
-          (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) : '') +
+          (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) + (r.returnRemark ? ' \u2014 ' + escapeHtml(r.returnRemark) : '') : '') +
           (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' (' + r.transferredToRecord + ') ' + r.transferDate + ' by ' + escapeHtml(r.transferredBy) : '') +
           (r.status === 'out' ? '&mdash;' : '') +
         '</td>' +
@@ -959,7 +1024,7 @@
       '</style></head><body>' +
       '<h1>JN Business Chairs &amp; Tables Ledger</h1>' +
       '<div class="sub">Report generated ' + nowDisplay() + ' &mdash; ' + list.length + ' record(s)</div>' +
-      '<table><thead><tr><th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Status</th><th>Return info</th></tr></thead>' +
+      '<table><thead><tr><th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Total</th><th>Date out</th><th>Status</th><th>Return info</th></tr></thead>' +
       '<tbody>' + rowsHtml + '</tbody></table>' +
       '</body></html>';
     win.document.write(html);
@@ -992,7 +1057,7 @@
         '<div class="rec-top">' +
           '<div>' +
             '<span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span>' +
-            '<div class="rec-name">' + escapeHtml(r.name) + '</div>' +
+            '<div class="rec-name" data-open-return="' + r.id + '" style="cursor:pointer; text-decoration:underline dotted;" title="Click to fill up the return form">' + escapeHtml(r.name) + '</div>' +
             '<div class="rec-meta">' + escapeHtml(r.barangay || '\u2014') + ' &middot; ' + escapeHtml(r.phone || '\u2014') + ' &middot; <span class="mono">' + r.id + '</span></div>' +
           '</div>' +
           '<div class="row-actions">' +
@@ -1027,22 +1092,28 @@
       var label = t.type === 'Other' && t.note ? 'Other table (' + escapeHtml(t.note) + ')' : t.type + ' table';
       checklistRows.push(t.qty + ' &times; ' + label);
     });
+    (rec.packages||[]).forEach(function(p){ checklistRows.push(p.qty + ' &times; ' + p.type); });
 
     wrap.innerHTML =
       '<div class="panel">' +
         '<h2>Checklist for ' + escapeHtml(rec.name) + '</h2>' +
         '<p class="sub"><span class="mono">' + rec.id + '</span> &middot; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' &middot; out since ' + rec.dateOut + '</p>' +
         '<fieldset><legend>Items to check in</legend>' +
-          checklistRows.map(function(row){
-            return '<div class="option-row"><label class="opt"><input type="checkbox" checked disabled> ' + row + '</label></div>';
+          checklistRows.map(function(row, i){
+            return '<div class="option-row"><label class="opt"><input type="checkbox" class="return-check" checked data-idx="' + i + '"> ' + row + '</label></div>';
           }).join('') +
         '</fieldset>' +
         '<form id="returnForm">' +
           '<div id="returnFormError" class="login-error hidden"></div>' +
+          '<div class="field">' +
+            '<label for="returnRemark">Remark (if anything on the checklist is missing or incomplete)</label>' +
+            '<textarea id="returnRemark" rows="2" placeholder="e.g. 2 white chairs still with the customer, will follow up..."></textarea>' +
+          '</div>' +
           '<div class="grid2">' +
             '<div class="field"><label>Date &amp; time received</label><div class="readout">' + nowDisplay() + '</div></div>' +
             '<div class="field"><label for="receivedBy">Received by (staff name)</label><input type="text" id="receivedBy" required></div>' +
           '</div>' +
+          '<p class="helper" id="checklistGateNote">Uncheck any item that hasn\'t actually come back \u2014 the return can only be confirmed once everything on the checklist is checked.</p>' +
           '<div class="row-actions">' +
             '<button type="submit" class="btn btn-primary" id="confirmReturnBtn">Confirm return</button>' +
             '<button type="button" class="btn btn-ghost" id="cancelReturn">Cancel</button>' +
@@ -1051,13 +1122,33 @@
         '<div id="returnStub"></div>' +
       '</div>';
 
+    function updateConfirmState(){
+      var boxes = wrap.querySelectorAll('.return-check');
+      var allChecked = Array.prototype.every.call(boxes, function(b){ return b.checked; });
+      var btn = document.getElementById('confirmReturnBtn');
+      var note = document.getElementById('checklistGateNote');
+      btn.disabled = !allChecked;
+      note.style.color = allChecked ? '#8a8f84' : 'var(--red)';
+      note.textContent = allChecked
+        ? 'All items checked \u2014 ready to confirm the return.'
+        : 'Uncheck any item that hasn\'t actually come back, and note why below \u2014 the return can only be confirmed once everything on the checklist is checked.';
+    }
+    wrap.querySelectorAll('.return-check').forEach(function(cb){
+      cb.addEventListener('change', updateConfirmState);
+    });
+    updateConfirmState();
+
     document.getElementById('cancelReturn').addEventListener('click', function(){
       wrap.innerHTML = '';
     });
 
     document.getElementById('returnForm').addEventListener('submit', async function(e){
       e.preventDefault();
+      var boxes = wrap.querySelectorAll('.return-check');
+      var allChecked = Array.prototype.every.call(boxes, function(b){ return b.checked; });
+      if (!allChecked) return;
       var receivedBy = document.getElementById('receivedBy').value.trim();
+      var remark = document.getElementById('returnRemark').value.trim();
       if (!receivedBy) return;
       var btn = document.getElementById('confirmReturnBtn');
       var errBox = document.getElementById('returnFormError');
@@ -1066,7 +1157,8 @@
         var updated = await updateRecordInDB(id, {
           status: 'returned',
           date_returned: new Date().toISOString(),
-          received_by: receivedBy
+          received_by: receivedBy,
+          return_remark: remark || null
         });
         var idx = state.records.findIndex(function(r){ return r.id === id; });
         if (idx !== -1) state.records[idx] = updated;
@@ -1246,7 +1338,7 @@
       return;
     }
     wrap.innerHTML = '<div style="overflow-x:auto;"><table class="log"><thead><tr>' +
-      '<th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Date out</th><th>Status</th><th>Return info</th><th></th>' +
+      '<th>ID</th><th>Type</th><th>Name</th><th>Barangay</th><th>Phone</th><th>Items</th><th>Total</th><th>Date out</th><th>Status</th><th>Return info</th>' +
       '</tr></thead><tbody>' +
       list.map(function(r){
         return '<tr>' +
@@ -1255,42 +1347,26 @@
           '<td>' + escapeHtml(r.name) + (r.transferredFromRecord ? '<div class="helper">from <span class="mono">' + r.transferredFromRecord + '</span></div>' : '') + '</td>' +
           '<td>' + escapeHtml(r.barangay || '\u2014') + '</td>' +
           '<td>' + escapeHtml(r.phone || '\u2014') + '</td>' +
-          '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
+          '<td>' + escapeHtml(itemsSummary(r)) + (r.remark ? '<div class="helper">' + escapeHtml(r.remark) + '</div>' : '') + '</td>' +
+          '<td class="mono">' + (r.type === 'rent' && r.totalPrice !== null ? '\u20b1' + Number(r.totalPrice).toLocaleString() : '\u2014') + '</td>' +
           '<td class="mono">' + r.dateOut + '</td>' +
           '<td><span class="badge ' + (r.status === 'out' ? 'out' : r.status) + '">' + (r.status === 'out' ? 'Still out' : (r.status === 'transferred' ? 'Transferred' : 'Returned')) + '</span></td>' +
           '<td>' +
-            (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) : '') +
+            (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) + (r.returnRemark ? '<div class="helper">' + escapeHtml(r.returnRemark) + '</div>' : '') : '') +
             (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' <span class="mono">(' + r.transferredToRecord + ')</span><br>' + r.transferDate + '<br>by ' + escapeHtml(r.transferredBy) : '') +
             (r.status === 'out' ? '&mdash;' : '') +
           '</td>' +
-          '<td><button class="btn btn-danger btn-sm" data-delete="' + r.id + '">Delete</button></td>' +
         '</tr>';
       }).join('') +
       '</tbody></table></div>';
-
-    wrap.querySelectorAll('[data-delete]').forEach(function(btn){
-      btn.addEventListener('click', async function(){
-        var id = btn.getAttribute('data-delete');
-        if (!confirm('Delete record ' + id + '? This cannot be undone.')) return;
-        btn.disabled = true; btn.textContent = 'Deleting...';
-        try{
-          await deleteRecordFromDB(id);
-          state.records = state.records.filter(function(r){ return r.id !== id; });
-          renderLogTable();
-        }catch(err){
-          showDbError('Could not delete: ' + (err.message || err));
-          btn.disabled = false; btn.textContent = 'Delete';
-        }
-      });
-    });
   }
 
   // ---------- CSV Export ----------
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
     var list = filteredRecords();
-    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Status','Date Returned','Received By','Transferred To','Transferred To Record','Transfer Date','Transferred By','Transferred From Record'];
+    var header = ['ID','Type','Name','Barangay','Phone','Items','Total Price','Remark','Date Out','Status','Date Returned','Received By','Return Remark','Transferred To','Transferred To Record','Transfer Date','Transferred By','Transferred From Record'];
     var rows = list.map(function(r){
-      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '', r.transferredTo || '', r.transferredToRecord || '', r.transferDate || '', r.transferredBy || '', r.transferredFromRecord || '']
+      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), (r.totalPrice !== null ? r.totalPrice : ''), r.remark || '', r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '', r.returnRemark || '', r.transferredTo || '', r.transferredToRecord || '', r.transferDate || '', r.transferredBy || '', r.transferredFromRecord || '']
         .map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
     });
     var csv = header.join(',') + '\n' + rows.join('\n');
