@@ -1009,7 +1009,7 @@
         '<td>' +
           (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) + (r.returnRemark ? ' \u2014 ' + escapeHtml(r.returnRemark) : '') : '') +
           (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' (' + r.transferredToRecord + ') ' + r.transferDate + ' by ' + escapeHtml(r.transferredBy) : '') +
-          (r.status === 'out' ? '&mdash;' : '') +
+          (r.status === 'out' ? (r.returnRemark ? 'Balance: ' + escapeHtml(r.returnRemark) + ' (' + r.dateReturned + ' by ' + escapeHtml(r.receivedBy) + ')' : '&mdash;') : '') +
         '</td>' +
       '</tr>';
     }).join('');
@@ -1066,6 +1066,7 @@
           '</div>' +
         '</div>' +
         '<div class="rec-items">Out since <span class="mono">' + r.dateOut + '</span>: ' + escapeHtml(itemsSummary(r)) + '</div>' +
+        (r.returnRemark ? '<div class="rec-items" style="color:var(--red);">Balance noted: ' + escapeHtml(r.returnRemark) + '</div>' : '') +
       '</div>';
     }).join('');
 
@@ -1086,21 +1087,21 @@
     if (!rec) return;
     var wrap = document.getElementById('returnChecklistWrap');
 
-    var checklistRows = [];
-    (rec.chairs||[]).forEach(function(c){ checklistRows.push(c.qty + ' &times; ' + c.type + ' chair'); });
+    var checkItems = [];
+    (rec.chairs||[]).forEach(function(c){ checkItems.push({ bucket:'chairs', type:c.type, qty:c.qty, note:c.note, label: c.qty + ' &times; ' + c.type + ' chair' }); });
     (rec.tables||[]).forEach(function(t){
       var label = t.type === 'Other' && t.note ? 'Other table (' + escapeHtml(t.note) + ')' : t.type + ' table';
-      checklistRows.push(t.qty + ' &times; ' + label);
+      checkItems.push({ bucket:'tables', type:t.type, qty:t.qty, note:t.note, label: t.qty + ' &times; ' + label });
     });
-    (rec.packages||[]).forEach(function(p){ checklistRows.push(p.qty + ' &times; ' + p.type); });
+    (rec.packages||[]).forEach(function(p){ checkItems.push({ bucket:'packages', type:p.type, qty:p.qty, label: p.qty + ' &times; ' + p.type }); });
 
     wrap.innerHTML =
       '<div class="panel">' +
         '<h2>Checklist for ' + escapeHtml(rec.name) + '</h2>' +
         '<p class="sub"><span class="mono">' + rec.id + '</span> &middot; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' &middot; out since ' + rec.dateOut + '</p>' +
         '<fieldset><legend>Items to check in</legend>' +
-          checklistRows.map(function(row, i){
-            return '<div class="option-row"><label class="opt"><input type="checkbox" class="return-check" checked data-idx="' + i + '"> ' + row + '</label></div>';
+          checkItems.map(function(item, i){
+            return '<div class="option-row"><label class="opt"><input type="checkbox" class="return-check" checked data-idx="' + i + '"> ' + item.label + '</label></div>';
           }).join('') +
         '</fieldset>' +
         '<form id="returnForm">' +
@@ -1110,28 +1111,33 @@
             '<textarea id="returnRemark" rows="2" placeholder="e.g. 2 white chairs still with the customer, will follow up..."></textarea>' +
           '</div>' +
           '<div class="grid2">' +
-            '<div class="field"><label>Date &amp; time received</label><div class="readout">' + nowDisplay() + '</div></div>' +
+            '<div class="field"><label>Date &amp; time</label><div class="readout">' + nowDisplay() + '</div></div>' +
             '<div class="field"><label for="receivedBy">Received by (staff name)</label><input type="text" id="receivedBy" required></div>' +
           '</div>' +
-          '<p class="helper" id="checklistGateNote">Uncheck any item that hasn\'t actually come back \u2014 the return can only be confirmed once everything on the checklist is checked.</p>' +
+          '<p class="helper" id="checklistGateNote">All items checked \u2014 ready to confirm the return.</p>' +
           '<div class="row-actions">' +
             '<button type="submit" class="btn btn-primary" id="confirmReturnBtn">Confirm return</button>' +
+            '<button type="button" class="btn btn-brass" id="balanceBtn" disabled>Balance (partial return)</button>' +
             '<button type="button" class="btn btn-ghost" id="cancelReturn">Cancel</button>' +
           '</div>' +
         '</form>' +
         '<div id="returnStub"></div>' +
       '</div>';
 
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     function updateConfirmState(){
       var boxes = wrap.querySelectorAll('.return-check');
       var allChecked = Array.prototype.every.call(boxes, function(b){ return b.checked; });
-      var btn = document.getElementById('confirmReturnBtn');
+      var confirmBtn = document.getElementById('confirmReturnBtn');
+      var balanceBtn = document.getElementById('balanceBtn');
       var note = document.getElementById('checklistGateNote');
-      btn.disabled = !allChecked;
+      confirmBtn.disabled = !allChecked;
+      balanceBtn.disabled = allChecked;
       note.style.color = allChecked ? '#8a8f84' : 'var(--red)';
       note.textContent = allChecked
         ? 'All items checked \u2014 ready to confirm the return.'
-        : 'Uncheck any item that hasn\'t actually come back, and note why below \u2014 the return can only be confirmed once everything on the checklist is checked.';
+        : 'Some items are unchecked. Explain what\'s missing in the remark, then use "Balance" to record what came back and keep the rest open \u2014 "Confirm return" only works once everything is checked.';
     }
     wrap.querySelectorAll('.return-check').forEach(function(cb){
       cb.addEventListener('change', updateConfirmState);
@@ -1171,6 +1177,66 @@
         btn.disabled = false; btn.textContent = 'Confirm return';
       }
     });
+
+    document.getElementById('balanceBtn').addEventListener('click', async function(){
+      var boxes = wrap.querySelectorAll('.return-check');
+      var allChecked = Array.prototype.every.call(boxes, function(b){ return b.checked; });
+      if (allChecked) return;
+      var receivedBy = document.getElementById('receivedBy').value.trim();
+      var remark = document.getElementById('returnRemark').value.trim();
+      var errBox = document.getElementById('returnFormError');
+      if (!receivedBy || !remark){
+        errBox.textContent = 'Please add the staff name and a remark explaining what\'s still missing.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+      errBox.classList.add('hidden');
+
+      var stillOut = { chairs: [], tables: [], packages: [] };
+      boxes.forEach(function(b){
+        var item = checkItems[parseInt(b.getAttribute('data-idx'), 10)];
+        if (!b.checked){
+          var entry = { type: item.type, qty: item.qty };
+          if (item.note) entry.note = item.note;
+          stillOut[item.bucket].push(entry);
+        }
+      });
+
+      var btn = this;
+      btn.disabled = true; btn.textContent = 'Saving...';
+      var nothingLeft = (stillOut.chairs.length + stillOut.tables.length + stillOut.packages.length) === 0;
+      try{
+        var updated = await updateRecordInDB(id, {
+          chairs: stillOut.chairs, tables: stillOut.tables, packages: stillOut.packages,
+          status: nothingLeft ? 'returned' : 'out',
+          date_returned: new Date().toISOString(),
+          received_by: receivedBy,
+          return_remark: remark
+        });
+        var idx = state.records.findIndex(function(r){ return r.id === id; });
+        if (idx !== -1) state.records[idx] = updated;
+        var stubWrap = document.getElementById('returnStub');
+        stubWrap.innerHTML =
+          '<div class="stub">' +
+            '<div class="stub-head">' +
+              '<div><div class="stub-id mono">' + updated.id + '</div><div class="helper">Partial return (balance)</div></div>' +
+              '<div class="stamp out">Balance</div>' +
+            '</div>' +
+            '<dl>' +
+              '<dt>Name</dt><dd>' + escapeHtml(rec.name) + '</dd>' +
+              '<dt>Still out</dt><dd>' + escapeHtml(itemsSummary(updated)) + '</dd>' +
+              '<dt>Remark</dt><dd>' + escapeHtml(remark) + '</dd>' +
+              '<dt>Recorded by</dt><dd>' + escapeHtml(receivedBy) + '</dd>' +
+            '</dl>' +
+          '</div>';
+        document.getElementById('returnForm').classList.add('hidden');
+        renderReturnResults(returnSearch.value.trim().toLowerCase());
+      }catch(err){
+        errBox.textContent = 'Could not save: ' + (err.message || err);
+        errBox.classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Balance (partial return)';
+      }
+    });
   }
 
   function openTransferForm(id){
@@ -1184,6 +1250,7 @@
       var label = t.type === 'Other' && t.note ? 'Other table (' + escapeHtml(t.note) + ')' : t.type + ' table';
       checklistRows.push(t.qty + ' &times; ' + label);
     });
+    (rec.packages||[]).forEach(function(p){ checklistRows.push(p.qty + ' &times; ' + p.type); });
 
     wrap.innerHTML =
       '<div class="panel">' +
@@ -1211,6 +1278,8 @@
         '<div id="transferStub"></div>' +
       '</div>';
 
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     document.getElementById('cancelTransfer').addEventListener('click', function(){
       wrap.innerHTML = '';
     });
@@ -1232,7 +1301,7 @@
       try{
         var newRec = await insertRecordToDB({
           type: rec.type, name: newName, barangay: newBarangay, phone: newPhone,
-          chairs: rec.chairs, tables: rec.tables,
+          chairs: rec.chairs, tables: rec.tables, packages: rec.packages,
           transferred_from_record: rec.id
         });
         var updatedOld = await updateRecordInDB(rec.id, {
@@ -1354,7 +1423,7 @@
           '<td>' +
             (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) + (r.returnRemark ? '<div class="helper">' + escapeHtml(r.returnRemark) + '</div>' : '') : '') +
             (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' <span class="mono">(' + r.transferredToRecord + ')</span><br>' + r.transferDate + '<br>by ' + escapeHtml(r.transferredBy) : '') +
-            (r.status === 'out' ? '&mdash;' : '') +
+            (r.status === 'out' ? (r.returnRemark ? '<span class="badge transferred">Balance</span><div class="helper">' + escapeHtml(r.returnRemark) + '<br>' + r.dateReturned + ' by ' + escapeHtml(r.receivedBy) + '</div>' : '&mdash;') : '') +
           '</td>' +
         '</tr>';
       }).join('') +
