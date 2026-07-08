@@ -293,6 +293,7 @@
   .badge.borrow{background:#F1E6D2; color:var(--brass);}
   .badge.out{background:#FBEAEA; color:var(--red);}
   .badge.returned{background:#E4EEE8; color:var(--forest-2);}
+  .badge.transferred{background:#EDE5F6; color:#6B4A9E;}
   .rec-name{font-weight:700; font-size:15px; margin:4px 0 2px;}
   .rec-meta{font-size:12px; color:#6b7268;}
   .rec-items{font-size:13px; margin-top:8px; color:var(--ink);}
@@ -370,7 +371,7 @@
     <nav class="tabs">
       <button data-view="newRent" class="active">New Rent</button>
       <button data-view="newBorrow">New Barrow</button>
-      <button data-view="returns">Process Return</button>
+      <button data-view="returns">Returns &amp; Transfers</button>
       <button data-view="records">All Records</button>
     </nav>
   </header>
@@ -506,8 +507,8 @@
     <!-- ---------------- RETURNS ---------------- -->
     <section id="view-returns" class="view hidden">
       <div class="panel">
-        <h2>Process a Return</h2>
-        <p class="sub">Search the name of the person who rented or borrowed to bring up their checklist.</p>
+        <h2>Returns &amp; Transfers</h2>
+        <p class="sub">Search the name of the person who rented or borrowed. Return closes it out; Transfer hands the same items to someone else without a return trip.</p>
         <div class="toolbar">
           <input type="text" id="returnSearch" placeholder="Type a name to search...">
           <button class="btn btn-ghost btn-sm" id="refreshReturnsBtn">&#8635; Refresh</button>
@@ -533,6 +534,7 @@
             <option value="all">All statuses</option>
             <option value="out">Still out</option>
             <option value="returned">Returned</option>
+            <option value="transferred">Transferred</option>
           </select>
           <button class="btn btn-ghost btn-sm" id="refreshLogBtn">&#8635; Refresh</button>
           <button class="btn btn-ghost btn-sm" id="printLogBtn">Print / Save PDF</button>
@@ -616,7 +618,11 @@
       dateOutISO: row.date_out,
       status: row.status,
       dateReturned: row.date_returned ? formatDate(row.date_returned) : null,
-      receivedBy: row.received_by
+      receivedBy: row.received_by,
+      transferredTo: row.transferred_to || null,
+      transferredToRecord: row.transferred_to_record || null,
+      transferDate: row.transfer_date ? formatDate(row.transfer_date) : null,
+      transferredFromRecord: row.transferred_from_record || null
     };
   }
 
@@ -914,8 +920,12 @@
         '<td>' + escapeHtml(r.phone) + '</td>' +
         '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
         '<td>' + r.dateOut + '</td>' +
-        '<td>' + (r.status === 'out' ? 'Still out' : 'Returned') + '</td>' +
-        '<td>' + (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) : '&mdash;') + '</td>' +
+        '<td>' + (r.status === 'out' ? 'Still out' : (r.status === 'transferred' ? 'Transferred' : 'Returned')) + '</td>' +
+        '<td>' +
+          (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) : '') +
+          (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' (' + r.transferredToRecord + ') ' + r.transferDate : '') +
+          (r.status === 'out' ? '&mdash;' : '') +
+        '</td>' +
       '</tr>';
     }).join('');
     var html = '<!DOCTYPE html><html><head><title>JN Business Ledger Report</title><meta charset="utf-8">' +
@@ -963,9 +973,12 @@
           '<div>' +
             '<span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span>' +
             '<div class="rec-name">' + escapeHtml(r.name) + '</div>' +
-            '<div class="rec-meta">' + escapeHtml(r.barangay) + ' &middot; ' + escapeHtml(r.phone) + ' &middot; <span class="mono">' + r.id + '</span></div>' +
+            '<div class="rec-meta">' + escapeHtml(r.barangay) + ' &middot; ' + escapeHtml(r.phone || '\u2014') + ' &middot; <span class="mono">' + r.id + '</span></div>' +
           '</div>' +
-          '<button class="btn btn-brass" data-open-return="' + r.id + '">Process return</button>' +
+          '<div class="row-actions">' +
+            '<button class="btn btn-brass" data-open-return="' + r.id + '">Process return</button>' +
+            '<button class="btn btn-ghost" data-open-transfer="' + r.id + '">Transfer</button>' +
+          '</div>' +
         '</div>' +
         '<div class="rec-items">Out since <span class="mono">' + r.dateOut + '</span>: ' + escapeHtml(itemsSummary(r)) + '</div>' +
       '</div>';
@@ -974,6 +987,11 @@
     wrap.querySelectorAll('[data-open-return]').forEach(function(btn){
       btn.addEventListener('click', function(){
         openReturnChecklist(btn.getAttribute('data-open-return'));
+      });
+    });
+    wrap.querySelectorAll('[data-open-transfer]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        openTransferForm(btn.getAttribute('data-open-transfer'));
       });
     });
   }
@@ -1043,6 +1061,137 @@
     });
   }
 
+  function openTransferForm(id){
+    var rec = state.records.find(function(r){ return r.id === id; });
+    if (!rec) return;
+    var wrap = document.getElementById('returnChecklistWrap');
+
+    var checklistRows = [];
+    (rec.chairs||[]).forEach(function(c){ checklistRows.push(c.qty + ' &times; ' + c.type + ' chair'); });
+    (rec.tables||[]).forEach(function(t){
+      var label = t.type === 'Other' && t.note ? 'Other table (' + escapeHtml(t.note) + ')' : t.type + ' table';
+      checklistRows.push(t.qty + ' &times; ' + label);
+    });
+
+    wrap.innerHTML =
+      '<div class="panel">' +
+        '<h2>Transfer from ' + escapeHtml(rec.name) + '</h2>' +
+        '<p class="sub"><span class="mono">' + rec.id + '</span> &middot; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' &middot; out since ' + rec.dateOut + '. The same items move to the new person below \u2014 nothing to reselect.</p>' +
+        '<fieldset><legend>Items being transferred</legend>' +
+          checklistRows.map(function(row){
+            return '<div class="option-row"><label class="opt"><input type="checkbox" checked disabled> ' + row + '</label></div>';
+          }).join('') +
+        '</fieldset>' +
+        '<form id="transferForm">' +
+          '<div id="transferFormError" class="login-error hidden"></div>' +
+          '<div class="grid2">' +
+            '<div class="field"><label for="transferName">New holder\'s name</label><input type="text" id="transferName" required></div>' +
+            '<div class="field"><label for="transferBarangay">Barangay</label><input type="text" id="transferBarangay" required></div>' +
+            '<div class="field"><label for="transferPhone">Phone number (optional)</label><input type="tel" id="transferPhone" placeholder="09XX XXX XXXX"></div>' +
+            '<div class="field"><label>Date &amp; time of transfer</label><div class="readout">' + nowDisplay() + '</div></div>' +
+          '</div>' +
+          '<div class="row-actions">' +
+            '<button type="submit" class="btn btn-primary" id="confirmTransferBtn">Confirm transfer</button>' +
+            '<button type="button" class="btn btn-ghost" id="cancelTransfer">Cancel</button>' +
+          '</div>' +
+        '</form>' +
+        '<div id="transferStub"></div>' +
+      '</div>';
+
+    document.getElementById('cancelTransfer').addEventListener('click', function(){
+      wrap.innerHTML = '';
+    });
+
+    document.getElementById('transferForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      var newName = document.getElementById('transferName').value.trim();
+      var newBarangay = document.getElementById('transferBarangay').value.trim();
+      var newPhone = document.getElementById('transferPhone').value.trim();
+      var errBox = document.getElementById('transferFormError');
+      if (!newName || !newBarangay){
+        errBox.textContent = 'Please add the new holder\'s name and barangay.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+      var btn = document.getElementById('confirmTransferBtn');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try{
+        var newRec = await insertRecordToDB({
+          type: rec.type, name: newName, barangay: newBarangay, phone: newPhone,
+          chairs: rec.chairs, tables: rec.tables,
+          transferred_from_record: rec.id
+        });
+        var updatedOld = await updateRecordInDB(rec.id, {
+          status: 'transferred',
+          transfer_date: new Date().toISOString(),
+          transferred_to: newName,
+          transferred_to_record: newRec.id
+        });
+        var idx = state.records.findIndex(function(r){ return r.id === rec.id; });
+        if (idx !== -1) state.records[idx] = updatedOld;
+        state.records.unshift(newRec);
+
+        var stubWrap = document.getElementById('transferStub');
+        stubWrap.innerHTML =
+          '<div class="stub">' +
+            '<div class="stub-head">' +
+              '<div><div class="stub-id mono">' + updatedOld.id + ' &rarr; ' + newRec.id + '</div>' +
+              '<div class="helper">Transfer record</div></div>' +
+              '<div class="stamp">Transferred</div>' +
+            '</div>' +
+            '<dl>' +
+              '<dt>From</dt><dd>' + escapeHtml(rec.name) + ' (' + escapeHtml(rec.barangay) + ')</dd>' +
+              '<dt>To</dt><dd>' + escapeHtml(newName) + ' (' + escapeHtml(newBarangay) + (newPhone ? ', ' + escapeHtml(newPhone) : '') + ')</dd>' +
+              '<dt>Items</dt><dd>' + escapeHtml(itemsSummary(newRec)) + '</dd>' +
+              '<dt>Transfer date</dt><dd class="mono">' + nowDisplay() + '</dd>' +
+              '<dt>New record</dt><dd class="mono">' + newRec.id + ' is now the active record for future returns or transfers</dd>' +
+            '</dl>' +
+            '<button type="button" class="btn btn-ghost btn-sm" data-print-transfer="1">Print / Save PDF</button>' +
+          '</div>';
+        stubWrap.querySelector('[data-print-transfer]').addEventListener('click', function(){
+          printTransferReceipt(rec, newName, newBarangay, newPhone, newRec, updatedOld);
+        });
+
+        document.getElementById('transferForm').classList.add('hidden');
+        renderReturnResults(returnSearch.value.trim().toLowerCase());
+      }catch(err){
+        errBox.textContent = 'Could not save the transfer: ' + (err.message || err);
+        errBox.classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Confirm transfer';
+      }
+    });
+  }
+
+  function printTransferReceipt(oldRec, newName, newBarangay, newPhone, newRec, updatedOld){
+    var win = window.open('', '_blank', 'width=440,height=680');
+    if (!win){ alert('Please allow pop-ups for this site to print.'); return; }
+    function row(label, value){ return '<tr><td class="label">' + label + '</td><td>' + escapeHtml(value) + '</td></tr>'; }
+    var html = '<!DOCTYPE html><html><head><title>' + updatedOld.id + ' transfer</title><meta charset="utf-8">' +
+      '<style>' +
+        'body{font-family: Georgia, serif; padding:28px; color:#1F2A24;}' +
+        'h1{font-size:19px;margin:0 0 2px;}' +
+        '.sub{font-size:12px;color:#666;margin-bottom:18px;}' +
+        'table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}' +
+        'td{padding:7px 0;border-bottom:1px dashed #ccc;vertical-align:top;}' +
+        'td.label{color:#666;width:140px;}' +
+        '.stamp{display:inline-block;border:2px solid #6B4A9E; color:#6B4A9E; padding:4px 12px;border-radius:4px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;font-size:11px;margin-bottom:16px;}' +
+      '</style></head><body>' +
+      '<div class="sub">JN Business Chairs &amp; Tables Ledger</div>' +
+      '<h1>' + updatedOld.id + ' &rarr; ' + newRec.id + ' &mdash; Transfer</h1>' +
+      '<div class="stamp">Transferred</div>' +
+      '<table>' +
+        row('From', oldRec.name + ' (' + oldRec.barangay + ')') +
+        row('To', newName + ' (' + newBarangay + (newPhone ? ', ' + newPhone : '') + ')') +
+        row('Items', itemsSummary(newRec)) +
+        row('Transfer date', nowDisplay()) +
+      '</table>' +
+      '</body></html>';
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function(){ win.print(); }, 300);
+  }
+
   // ---------- All Records / Log ----------
   var logSearch = document.getElementById('logSearch');
   var logTypeFilter = document.getElementById('logTypeFilter');
@@ -1078,13 +1227,17 @@
         return '<tr>' +
           '<td class="mono">' + r.id + '</td>' +
           '<td><span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span></td>' +
-          '<td>' + escapeHtml(r.name) + '</td>' +
+          '<td>' + escapeHtml(r.name) + (r.transferredFromRecord ? '<div class="helper">from <span class="mono">' + r.transferredFromRecord + '</span></div>' : '') + '</td>' +
           '<td>' + escapeHtml(r.barangay) + '</td>' +
-          '<td>' + escapeHtml(r.phone) + '</td>' +
+          '<td>' + escapeHtml(r.phone || '\u2014') + '</td>' +
           '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
           '<td class="mono">' + r.dateOut + '</td>' +
-          '<td><span class="badge ' + (r.status === 'out' ? 'out' : 'returned') + '">' + (r.status === 'out' ? 'Still out' : 'Returned') + '</span></td>' +
-          '<td>' + (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) : '&mdash;') + '</td>' +
+          '<td><span class="badge ' + (r.status === 'out' ? 'out' : r.status) + '">' + (r.status === 'out' ? 'Still out' : (r.status === 'transferred' ? 'Transferred' : 'Returned')) + '</span></td>' +
+          '<td>' +
+            (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) : '') +
+            (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' <span class="mono">(' + r.transferredToRecord + ')</span><br>' + r.transferDate : '') +
+            (r.status === 'out' ? '&mdash;' : '') +
+          '</td>' +
           '<td><button class="btn btn-danger btn-sm" data-delete="' + r.id + '">Delete</button></td>' +
         '</tr>';
       }).join('') +
@@ -1110,9 +1263,9 @@
   // ---------- CSV Export ----------
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
     var list = filteredRecords();
-    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Status','Date Returned','Received By'];
+    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Status','Date Returned','Received By','Transferred To','Transferred To Record','Transfer Date','Transferred From Record'];
     var rows = list.map(function(r){
-      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '']
+      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '', r.transferredTo || '', r.transferredToRecord || '', r.transferDate || '', r.transferredFromRecord || '']
         .map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
     });
     var csv = header.join(',') + '\n' + rows.join('\n');
