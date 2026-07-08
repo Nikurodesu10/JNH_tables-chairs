@@ -1057,7 +1057,7 @@
         '<div class="rec-top">' +
           '<div>' +
             '<span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span>' +
-            '<div class="rec-name" data-open-return="' + r.id + '" style="cursor:pointer; text-decoration:underline dotted;" title="Click to fill up the return form">' + escapeHtml(r.name) + '</div>' +
+            '<div class="rec-name">' + escapeHtml(r.name) + '</div>' +
             '<div class="rec-meta">' + escapeHtml(r.barangay || '\u2014') + ' &middot; ' + escapeHtml(r.phone || '\u2014') + ' &middot; <span class="mono">' + r.id + '</span></div>' +
           '</div>' +
           '<div class="row-actions">' +
