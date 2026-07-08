@@ -327,6 +327,13 @@
   @media print{
     header.top, .toolbar, .footnote, #dbErrorBanner, nav.tabs, form, .row-actions{display:none !important;}
   }
+
+  /* Slim, theme-matched scrollbar instead of the browser's default boxy one */
+  ::-webkit-scrollbar{width:10px; height:10px;}
+  ::-webkit-scrollbar-track{background:var(--paper);}
+  ::-webkit-scrollbar-thumb{background:var(--brass-2); border-radius:6px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--brass);}
+  html{scrollbar-width:thin; scrollbar-color:var(--brass-2) var(--paper);}
 </style>
 </head>
 <body>
@@ -399,12 +406,12 @@
               <div class="readout" id="rentNow">--</div>
             </div>
             <div class="field">
-              <label for="rentBarangay">Barangay</label>
-              <input type="text" id="rentBarangay" required>
+              <label for="rentBarangay">Barangay (optional)</label>
+              <input type="text" id="rentBarangay">
             </div>
             <div class="field">
-              <label for="rentPhone">Phone number</label>
-              <input type="tel" id="rentPhone" placeholder="09XX XXX XXXX" required>
+              <label for="rentPhone">Phone number (optional)</label>
+              <input type="tel" id="rentPhone" placeholder="09XX XXX XXXX">
             </div>
           </div>
 
@@ -463,12 +470,12 @@
               <div class="readout" id="borrowNow">--</div>
             </div>
             <div class="field">
-              <label for="borrowBarangay">Barangay</label>
-              <input type="text" id="borrowBarangay" required>
+              <label for="borrowBarangay">Barangay (optional)</label>
+              <input type="text" id="borrowBarangay">
             </div>
             <div class="field">
-              <label for="borrowPhone">Phone number</label>
-              <input type="tel" id="borrowPhone" placeholder="09XX XXX XXXX" required>
+              <label for="borrowPhone">Phone number (optional)</label>
+              <input type="tel" id="borrowPhone" placeholder="09XX XXX XXXX">
             </div>
           </div>
 
@@ -594,6 +601,18 @@
       parts.push(t.qty + ' ' + label + ' table' + (t.qty>1?'s':''));
     });
     return parts.length ? parts.join(', ') : 'No items recorded';
+  }
+  function whereContact(barangay, phone){
+    var parts = [];
+    if (barangay) parts.push(escapeHtml(barangay));
+    if (phone) parts.push(escapeHtml(phone));
+    return parts.length ? ' (' + parts.join(', ') + ')' : '';
+  }
+  function whereContactRaw(barangay, phone){
+    var parts = [];
+    if (barangay) parts.push(barangay);
+    if (phone) parts.push(phone);
+    return parts.length ? ' (' + parts.join(', ') + ')' : '';
   }
 
   function showDbError(msg){
@@ -786,8 +805,8 @@
     var tables = collectItems('rent-table', 'rent-table-qty', false);
     var errBox = document.getElementById('rentFormError');
 
-    if (!name || !barangay || !phone || (chairs.length === 0 && tables.length === 0)){
-      errBox.textContent = 'Please add the name, barangay, phone number, and at least one item with a quantity.';
+    if (!name || (chairs.length === 0 && tables.length === 0)){
+      errBox.textContent = 'Please add the name and at least one item with a quantity.';
       errBox.classList.remove('hidden');
       return;
     }
@@ -825,8 +844,8 @@
     var tables = collectItems('borrow-table', 'borrow-table-qty', true);
     var errBox = document.getElementById('borrowFormError');
 
-    if (!name || !barangay || !phone || (chairs.length === 0 && tables.length === 0)){
-      errBox.textContent = 'Please add the name, barangay, phone number, and at least one item with a quantity.';
+    if (!name || (chairs.length === 0 && tables.length === 0)){
+      errBox.textContent = 'Please add the name and at least one item with a quantity.';
       errBox.classList.remove('hidden');
       return;
     }
@@ -864,7 +883,7 @@
         '</div>' +
         '<dl>' +
           '<dt>Name</dt><dd>' + escapeHtml(rec.name) + '</dd>' +
-          '<dt>Barangay</dt><dd>' + escapeHtml(rec.barangay) + '</dd>' +
+          '<dt>Barangay</dt><dd>' + escapeHtml(rec.barangay || '\u2014') + '</dd>' +
           '<dt>Phone</dt><dd>' + escapeHtml(rec.phone) + '</dd>' +
           '<dt>Date out</dt><dd class="mono">' + rec.dateOut + '</dd>' +
           '<dt>Items</dt><dd>' + escapeHtml(itemsSummary(rec)) + '</dd>' +
@@ -897,7 +916,7 @@
       '<h1>' + rec.id + ' &mdash; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' Record</h1>' +
       '<div class="stamp">' + (isOut ? 'Recorded' : 'Returned') + '</div>' +
       '<table>' +
-        row('Name', rec.name) + row('Barangay', rec.barangay) + row('Phone', rec.phone) +
+        row('Name', rec.name) + row('Barangay', rec.barangay || '\u2014') + row('Phone', rec.phone || '\u2014') +
         row('Date out', rec.dateOut) + row('Items', itemsSummary(rec)) +
         (!isOut ? row('Date returned', rec.dateReturned) + row('Received by', rec.receivedBy) : '') +
       '</table>' +
@@ -917,8 +936,8 @@
         '<td>' + r.id + '</td>' +
         '<td>' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</td>' +
         '<td>' + escapeHtml(r.name) + '</td>' +
-        '<td>' + escapeHtml(r.barangay) + '</td>' +
-        '<td>' + escapeHtml(r.phone) + '</td>' +
+        '<td>' + escapeHtml(r.barangay || '\u2014') + '</td>' +
+        '<td>' + escapeHtml(r.phone || '\u2014') + '</td>' +
         '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
         '<td>' + r.dateOut + '</td>' +
         '<td>' + (r.status === 'out' ? 'Still out' : (r.status === 'transferred' ? 'Transferred' : 'Returned')) + '</td>' +
@@ -974,7 +993,7 @@
           '<div>' +
             '<span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span>' +
             '<div class="rec-name">' + escapeHtml(r.name) + '</div>' +
-            '<div class="rec-meta">' + escapeHtml(r.barangay) + ' &middot; ' + escapeHtml(r.phone || '\u2014') + ' &middot; <span class="mono">' + r.id + '</span></div>' +
+            '<div class="rec-meta">' + escapeHtml(r.barangay || '\u2014') + ' &middot; ' + escapeHtml(r.phone || '\u2014') + ' &middot; <span class="mono">' + r.id + '</span></div>' +
           '</div>' +
           '<div class="row-actions">' +
             '<button class="btn btn-brass" data-open-return="' + r.id + '">Process return</button>' +
@@ -1087,7 +1106,7 @@
           '<div id="transferFormError" class="login-error hidden"></div>' +
           '<div class="grid2">' +
             '<div class="field"><label for="transferName">New holder\'s name</label><input type="text" id="transferName" required></div>' +
-            '<div class="field"><label for="transferBarangay">Barangay</label><input type="text" id="transferBarangay" required></div>' +
+            '<div class="field"><label for="transferBarangay">Barangay (optional)</label><input type="text" id="transferBarangay"></div>' +
             '<div class="field"><label for="transferPhone">Phone number (optional)</label><input type="tel" id="transferPhone" placeholder="09XX XXX XXXX"></div>' +
             '<div class="field"><label for="transferStaff">Processed by (staff name)</label><input type="text" id="transferStaff" required></div>' +
             '<div class="field"><label>Date &amp; time of transfer</label><div class="readout">' + nowDisplay() + '</div></div>' +
@@ -1111,8 +1130,8 @@
       var newPhone = document.getElementById('transferPhone').value.trim();
       var staffName = document.getElementById('transferStaff').value.trim();
       var errBox = document.getElementById('transferFormError');
-      if (!newName || !newBarangay || !staffName){
-        errBox.textContent = 'Please add the new holder\'s name, barangay, and the staff name processing this transfer.';
+      if (!newName || !staffName){
+        errBox.textContent = 'Please add the new holder\'s name and the staff name processing this transfer.';
         errBox.classList.remove('hidden');
         return;
       }
@@ -1144,8 +1163,8 @@
               '<div class="stamp">Transferred</div>' +
             '</div>' +
             '<dl>' +
-              '<dt>From</dt><dd>' + escapeHtml(rec.name) + ' (' + escapeHtml(rec.barangay) + ')</dd>' +
-              '<dt>To</dt><dd>' + escapeHtml(newName) + ' (' + escapeHtml(newBarangay) + (newPhone ? ', ' + escapeHtml(newPhone) : '') + ')</dd>' +
+              '<dt>From</dt><dd>' + escapeHtml(rec.name) + ' (' + escapeHtml(rec.barangay || '\u2014') + ')</dd>' +
+              '<dt>To</dt><dd>' + escapeHtml(newName) + whereContact(newBarangay, newPhone) + '</dd>' +
               '<dt>Items</dt><dd>' + escapeHtml(itemsSummary(newRec)) + '</dd>' +
               '<dt>Transfer date</dt><dd class="mono">' + nowDisplay() + '</dd>' +
               '<dt>Processed by</dt><dd>' + escapeHtml(staffName) + '</dd>' +
@@ -1185,8 +1204,8 @@
       '<h1>' + updatedOld.id + ' &rarr; ' + newRec.id + ' &mdash; Transfer</h1>' +
       '<div class="stamp">Transferred</div>' +
       '<table>' +
-        row('From', oldRec.name + ' (' + oldRec.barangay + ')') +
-        row('To', newName + ' (' + newBarangay + (newPhone ? ', ' + newPhone : '') + ')') +
+        row('From', oldRec.name + whereContactRaw(oldRec.barangay, '')) +
+        row('To', newName + whereContactRaw(newBarangay, newPhone)) +
         row('Items', itemsSummary(newRec)) +
         row('Transfer date', nowDisplay()) +
         row('Processed by', staffName) +
@@ -1234,7 +1253,7 @@
           '<td class="mono">' + r.id + '</td>' +
           '<td><span class="badge ' + r.type + '">' + (r.type === 'rent' ? 'Rent' : 'Barrow') + '</span></td>' +
           '<td>' + escapeHtml(r.name) + (r.transferredFromRecord ? '<div class="helper">from <span class="mono">' + r.transferredFromRecord + '</span></div>' : '') + '</td>' +
-          '<td>' + escapeHtml(r.barangay) + '</td>' +
+          '<td>' + escapeHtml(r.barangay || '\u2014') + '</td>' +
           '<td>' + escapeHtml(r.phone || '\u2014') + '</td>' +
           '<td>' + escapeHtml(itemsSummary(r)) + '</td>' +
           '<td class="mono">' + r.dateOut + '</td>' +
