@@ -622,7 +622,8 @@
       transferredTo: row.transferred_to || null,
       transferredToRecord: row.transferred_to_record || null,
       transferDate: row.transfer_date ? formatDate(row.transfer_date) : null,
-      transferredFromRecord: row.transferred_from_record || null
+      transferredFromRecord: row.transferred_from_record || null,
+      transferredBy: row.transferred_by || null
     };
   }
 
@@ -923,7 +924,7 @@
         '<td>' + (r.status === 'out' ? 'Still out' : (r.status === 'transferred' ? 'Transferred' : 'Returned')) + '</td>' +
         '<td>' +
           (r.status === 'returned' ? r.dateReturned + ' by ' + escapeHtml(r.receivedBy) : '') +
-          (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' (' + r.transferredToRecord + ') ' + r.transferDate : '') +
+          (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' (' + r.transferredToRecord + ') ' + r.transferDate + ' by ' + escapeHtml(r.transferredBy) : '') +
           (r.status === 'out' ? '&mdash;' : '') +
         '</td>' +
       '</tr>';
@@ -1088,6 +1089,7 @@
             '<div class="field"><label for="transferName">New holder\'s name</label><input type="text" id="transferName" required></div>' +
             '<div class="field"><label for="transferBarangay">Barangay</label><input type="text" id="transferBarangay" required></div>' +
             '<div class="field"><label for="transferPhone">Phone number (optional)</label><input type="tel" id="transferPhone" placeholder="09XX XXX XXXX"></div>' +
+            '<div class="field"><label for="transferStaff">Processed by (staff name)</label><input type="text" id="transferStaff" required></div>' +
             '<div class="field"><label>Date &amp; time of transfer</label><div class="readout">' + nowDisplay() + '</div></div>' +
           '</div>' +
           '<div class="row-actions">' +
@@ -1107,9 +1109,10 @@
       var newName = document.getElementById('transferName').value.trim();
       var newBarangay = document.getElementById('transferBarangay').value.trim();
       var newPhone = document.getElementById('transferPhone').value.trim();
+      var staffName = document.getElementById('transferStaff').value.trim();
       var errBox = document.getElementById('transferFormError');
-      if (!newName || !newBarangay){
-        errBox.textContent = 'Please add the new holder\'s name and barangay.';
+      if (!newName || !newBarangay || !staffName){
+        errBox.textContent = 'Please add the new holder\'s name, barangay, and the staff name processing this transfer.';
         errBox.classList.remove('hidden');
         return;
       }
@@ -1125,7 +1128,8 @@
           status: 'transferred',
           transfer_date: new Date().toISOString(),
           transferred_to: newName,
-          transferred_to_record: newRec.id
+          transferred_to_record: newRec.id,
+          transferred_by: staffName
         });
         var idx = state.records.findIndex(function(r){ return r.id === rec.id; });
         if (idx !== -1) state.records[idx] = updatedOld;
@@ -1144,12 +1148,13 @@
               '<dt>To</dt><dd>' + escapeHtml(newName) + ' (' + escapeHtml(newBarangay) + (newPhone ? ', ' + escapeHtml(newPhone) : '') + ')</dd>' +
               '<dt>Items</dt><dd>' + escapeHtml(itemsSummary(newRec)) + '</dd>' +
               '<dt>Transfer date</dt><dd class="mono">' + nowDisplay() + '</dd>' +
+              '<dt>Processed by</dt><dd>' + escapeHtml(staffName) + '</dd>' +
               '<dt>New record</dt><dd class="mono">' + newRec.id + ' is now the active record for future returns or transfers</dd>' +
             '</dl>' +
             '<button type="button" class="btn btn-ghost btn-sm" data-print-transfer="1">Print / Save PDF</button>' +
           '</div>';
         stubWrap.querySelector('[data-print-transfer]').addEventListener('click', function(){
-          printTransferReceipt(rec, newName, newBarangay, newPhone, newRec, updatedOld);
+          printTransferReceipt(rec, newName, newBarangay, newPhone, newRec, updatedOld, staffName);
         });
 
         document.getElementById('transferForm').classList.add('hidden');
@@ -1162,7 +1167,7 @@
     });
   }
 
-  function printTransferReceipt(oldRec, newName, newBarangay, newPhone, newRec, updatedOld){
+  function printTransferReceipt(oldRec, newName, newBarangay, newPhone, newRec, updatedOld, staffName){
     var win = window.open('', '_blank', 'width=440,height=680');
     if (!win){ alert('Please allow pop-ups for this site to print.'); return; }
     function row(label, value){ return '<tr><td class="label">' + label + '</td><td>' + escapeHtml(value) + '</td></tr>'; }
@@ -1184,6 +1189,7 @@
         row('To', newName + ' (' + newBarangay + (newPhone ? ', ' + newPhone : '') + ')') +
         row('Items', itemsSummary(newRec)) +
         row('Transfer date', nowDisplay()) +
+        row('Processed by', staffName) +
       '</table>' +
       '</body></html>';
     win.document.write(html);
@@ -1235,7 +1241,7 @@
           '<td><span class="badge ' + (r.status === 'out' ? 'out' : r.status) + '">' + (r.status === 'out' ? 'Still out' : (r.status === 'transferred' ? 'Transferred' : 'Returned')) + '</span></td>' +
           '<td>' +
             (r.status === 'returned' ? '<span class="mono">' + r.dateReturned + '</span><br>by ' + escapeHtml(r.receivedBy) : '') +
-            (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' <span class="mono">(' + r.transferredToRecord + ')</span><br>' + r.transferDate : '') +
+            (r.status === 'transferred' ? 'To ' + escapeHtml(r.transferredTo) + ' <span class="mono">(' + r.transferredToRecord + ')</span><br>' + r.transferDate + '<br>by ' + escapeHtml(r.transferredBy) : '') +
             (r.status === 'out' ? '&mdash;' : '') +
           '</td>' +
           '<td><button class="btn btn-danger btn-sm" data-delete="' + r.id + '">Delete</button></td>' +
@@ -1263,9 +1269,9 @@
   // ---------- CSV Export ----------
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
     var list = filteredRecords();
-    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Status','Date Returned','Received By','Transferred To','Transferred To Record','Transfer Date','Transferred From Record'];
+    var header = ['ID','Type','Name','Barangay','Phone','Items','Date Out','Status','Date Returned','Received By','Transferred To','Transferred To Record','Transfer Date','Transferred By','Transferred From Record'];
     var rows = list.map(function(r){
-      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '', r.transferredTo || '', r.transferredToRecord || '', r.transferDate || '', r.transferredFromRecord || '']
+      return [r.id, r.type, r.name, r.barangay, r.phone, itemsSummary(r), r.dateOut, r.status, r.dateReturned || '', r.receivedBy || '', r.transferredTo || '', r.transferredToRecord || '', r.transferDate || '', r.transferredBy || '', r.transferredFromRecord || '']
         .map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
     });
     var csv = header.join(',') + '\n' + rows.join('\n');
