@@ -377,6 +377,7 @@
       <button data-view="newBorrow">New Barrow</button>
       <button data-view="returns">Returns &amp; Transfers</button>
       <button data-view="records">All Records</button>
+      <button data-view="inventory">Inventory</button>
     </nav>
   </header>
 
@@ -417,14 +418,17 @@
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-chair" value="Yellow"> Yellow chair <span class="helper">&#8369;10 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="Yellow" disabled>
+              <span class="helper avail-hint" data-item="Yellow"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-chair" value="White"> White chair <span class="helper">&#8369;10 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="White" disabled>
+              <span class="helper avail-hint" data-item="White"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-chair" value="Kid's Chair"> Kid's chair <span class="helper">&#8369;5 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-chair-qty" data-for="Kid's Chair" disabled>
+              <span class="helper avail-hint" data-item="Kid's Chair"></span>
             </div>
           </fieldset>
 
@@ -433,22 +437,32 @@
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-table" value="Round"> Round table <span class="helper">&#8369;100 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Round" disabled>
+              <span class="helper avail-hint" data-item="Round"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-table" value="Long"> Long table <span class="helper">&#8369;100 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Long" disabled>
+              <span class="helper avail-hint" data-item="Long"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-table" value="Steel"> Steel table <span class="helper">&#8369;50 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Steel" disabled>
+              <span class="helper avail-hint" data-item="Steel"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-table" value="Wood"> Wood table <span class="helper">&#8369;50 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Wood" disabled>
+              <span class="helper avail-hint" data-item="Wood"></span>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="rent-table" value="Plastic Square"> Plastic square table <span class="helper">&#8369;50 each</span></label>
+              <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Plastic Square" disabled>
+              <span class="helper avail-hint" data-item="Plastic Square"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="rent-table" value="Kid's Table"> Kid's table <span class="helper">&#8369;30 each</span></label>
               <input type="number" min="0" placeholder="Qty" class="rent-table-qty" data-for="Kid's Table" disabled>
+              <span class="helper avail-hint" data-item="Kid's Table"></span>
             </div>
           </fieldset>
 
@@ -507,6 +521,7 @@
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="borrow-chair" value="White"> White chair</label>
               <input type="number" min="0" placeholder="Qty" class="borrow-chair-qty" data-for="White" disabled>
+              <span class="helper avail-hint" data-item="White"></span>
             </div>
           </fieldset>
 
@@ -515,10 +530,17 @@
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="borrow-table" value="Wood"> Wood table</label>
               <input type="number" min="0" placeholder="Qty" class="borrow-table-qty" data-for="Wood" disabled>
+              <span class="helper avail-hint" data-item="Wood"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="borrow-table" value="Steel"> Steel table</label>
               <input type="number" min="0" placeholder="Qty" class="borrow-table-qty" data-for="Steel" disabled>
+              <span class="helper avail-hint" data-item="Steel"></span>
+            </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="borrow-table" value="Plastic Square"> Plastic square table</label>
+              <input type="number" min="0" placeholder="Qty" class="borrow-table-qty" data-for="Plastic Square" disabled>
+              <span class="helper avail-hint" data-item="Plastic Square"></span>
             </div>
             <div class="option-row">
               <label class="opt"><input type="checkbox" class="borrow-table" value="Other"> Other</label>
@@ -574,6 +596,18 @@
       </div>
     </section>
 
+    <!-- ---------------- INVENTORY ---------------- -->
+    <section id="view-inventory" class="view hidden">
+      <div class="panel">
+        <h2>Inventory</h2>
+        <p class="sub">Total stock on hand vs. what's currently out with rent/barrow customers, computed live from active records. To change a total stock count, update it directly in Supabase (the <span class="mono">inventory</span> table).</p>
+        <div class="toolbar">
+          <button class="btn btn-ghost btn-sm" id="refreshInventoryBtn">&#8635; Refresh</button>
+        </div>
+        <div id="inventoryTableWrap"></div>
+      </div>
+    </section>
+
   </main>
 
   <p class="footnote">Records are stored in a shared online database, so every device signed in sees the same ledger. Use "Export CSV" or "Print / Save PDF" any time you want an offline copy.</p>
@@ -597,7 +631,7 @@
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
-  var state = { records: [] };
+  var state = { records: [], inventory: [] };
 
   // ---------- Utilities ----------
   function nowDisplay(){
@@ -695,12 +729,80 @@
     var res = await db.from('records').delete().eq('record_no', recordNo);
     if (res.error) throw res.error;
   }
+  async function fetchInventoryFromDB(){
+    if (!db) return [];
+    var res = await db.from('inventory').select('*').order('category').order('item_type');
+    if (res.error) throw res.error;
+    return res.data || [];
+  }
   async function refreshRecords(){
     try{
       state.records = await fetchRecordsFromDB();
     }catch(e){
       showDbError('Could not load records from the database: ' + (e.message || e));
     }
+    try{
+      state.inventory = await fetchInventoryFromDB();
+    }catch(e){
+      showDbError('Could not load inventory from the database: ' + (e.message || e));
+    }
+    updateAvailabilityHints();
+  }
+
+  function computeCurrentlyOutMap(){
+    var out = {};
+    function add(type, qty){ out[type] = (out[type] || 0) + qty; }
+    state.records.forEach(function(r){
+      if (r.status !== 'out') return;
+      (r.chairs||[]).forEach(function(c){ add(c.type, c.qty); });
+      (r.tables||[]).forEach(function(t){ add(t.type, t.qty); });
+      (r.packages||[]).forEach(function(p){
+        if (p.type === "Kid's Set"){
+          add("Kid's Chair", p.qty * 4);
+          add("Kid's Table", p.qty * 1);
+        } else {
+          add(p.type, p.qty);
+        }
+      });
+    });
+    return out;
+  }
+
+  function updateAvailabilityHints(){
+    var outMap = computeCurrentlyOutMap();
+    var invMap = {};
+    state.inventory.forEach(function(inv){ invMap[inv.item_type] = inv.total_qty; });
+    document.querySelectorAll('.avail-hint').forEach(function(span){
+      var type = span.getAttribute('data-item');
+      if (!(type in invMap)){ span.textContent = ''; return; }
+      var available = invMap[type] - (outMap[type] || 0);
+      span.textContent = ' \u00b7 ' + available + ' available';
+      span.style.color = available <= 0 ? 'var(--red)' : '#8a8f84';
+    });
+  }
+
+  function renderInventoryTable(){
+    var wrap = document.getElementById('inventoryTableWrap');
+    if (!state.inventory.length){
+      wrap.innerHTML = '<div class="empty-state"><div class="display">No inventory set up yet.</div><p class="helper">Run inventory_setup.sql in Supabase to add stock counts.</p></div>';
+      return;
+    }
+    var outMap = computeCurrentlyOutMap();
+    wrap.innerHTML = '<div style="overflow-x:auto;"><table class="log"><thead><tr>' +
+      '<th>Item</th><th>Category</th><th>Total Stock</th><th>Currently Out</th><th>Available</th>' +
+      '</tr></thead><tbody>' +
+      state.inventory.map(function(inv){
+        var out = outMap[inv.item_type] || 0;
+        var available = inv.total_qty - out;
+        return '<tr>' +
+          '<td>' + escapeHtml(inv.item_type) + '</td>' +
+          '<td>' + (inv.category === 'chair' ? 'Chair' : 'Table') + '</td>' +
+          '<td class="mono">' + inv.total_qty + '</td>' +
+          '<td class="mono">' + out + '</td>' +
+          '<td class="mono" style="font-weight:700; color:' + (available <= 0 ? 'var(--red)' : 'var(--forest)') + ';">' + available + '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
   }
 
   // ---------- Login ----------
@@ -768,6 +870,11 @@
         await refreshRecords();
         renderReturnResults(document.getElementById('returnSearch').value.trim().toLowerCase());
       }
+      if (btn.dataset.view === 'inventory'){
+        document.getElementById('inventoryTableWrap').innerHTML = '<div class="empty-state">Loading inventory&hellip;</div>';
+        await refreshRecords();
+        renderInventoryTable();
+      }
     });
   });
 
@@ -780,6 +887,11 @@
     document.getElementById('returnResults').innerHTML = '<div class="empty-state">Loading records&hellip;</div>';
     await refreshRecords();
     renderReturnResults(document.getElementById('returnSearch').value.trim().toLowerCase());
+  });
+  document.getElementById('refreshInventoryBtn').addEventListener('click', async function(){
+    document.getElementById('inventoryTableWrap').innerHTML = '<div class="empty-state">Loading inventory&hellip;</div>';
+    await refreshRecords();
+    renderInventoryTable();
   });
 
   // ---------- Checkbox <-> qty enabling (generic) ----------
@@ -807,7 +919,7 @@
 
   var PRICES = {
     chair: { 'Yellow': 10, 'White': 10, "Kid's Chair": 5 },
-    table: { 'Round': 100, 'Long': 100, 'Steel': 50, 'Wood': 50, "Kid's Table": 30 },
+    table: { 'Round': 100, 'Long': 100, 'Steel': 50, 'Wood': 50, 'Plastic Square': 50, "Kid's Table": 30 },
     package: { "Kid's Set": 50 }
   };
   function computeRentTotal(chairs, tables, packages){
@@ -879,6 +991,7 @@
         remark: remark || null, total_price: totalPrice
       });
       state.records.unshift(rec);
+      updateAvailabilityHints();
       renderStub('rentStub', rec, 'out');
       rentForm.reset();
       document.querySelectorAll('.rent-chair-qty, .rent-table-qty, .rent-package-qty').forEach(function(i){ i.disabled = true; i.value=''; });
@@ -919,6 +1032,7 @@
         chairs: chairs, tables: tables
       });
       state.records.unshift(rec);
+      updateAvailabilityHints();
       renderStub('borrowStub', rec, 'out');
       borrowForm.reset();
       document.querySelectorAll('.borrow-chair-qty, .borrow-table-qty').forEach(function(i){ i.disabled = true; i.value=''; });
@@ -1168,6 +1282,7 @@
         });
         var idx = state.records.findIndex(function(r){ return r.id === id; });
         if (idx !== -1) state.records[idx] = updated;
+        updateAvailabilityHints();
         renderStub('returnStub', updated, 'returned');
         document.getElementById('returnForm').classList.add('hidden');
         renderReturnResults(returnSearch.value.trim().toLowerCase());
@@ -1215,6 +1330,7 @@
         });
         var idx = state.records.findIndex(function(r){ return r.id === id; });
         if (idx !== -1) state.records[idx] = updated;
+        updateAvailabilityHints();
         var stubWrap = document.getElementById('returnStub');
         stubWrap.innerHTML =
           '<div class="stub">' +
@@ -1314,6 +1430,7 @@
         var idx = state.records.findIndex(function(r){ return r.id === rec.id; });
         if (idx !== -1) state.records[idx] = updatedOld;
         state.records.unshift(newRec);
+        updateAvailabilityHints();
 
         var stubWrap = document.getElementById('transferStub');
         stubWrap.innerHTML =
