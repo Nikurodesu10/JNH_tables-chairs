@@ -729,6 +729,16 @@
     var res = await db.from('records').delete().eq('record_no', recordNo);
     if (res.error) throw res.error;
   }
+  async function fetchBalanceHistory(recordNo){
+    if (!db) return [];
+    var res = await db.from('balance_history').select('*').eq('record_no', recordNo).order('created_at', { ascending: true });
+    if (res.error) throw res.error;
+    return res.data || [];
+  }
+  async function insertBalanceHistory(entry){
+    var res = await db.from('balance_history').insert([entry]);
+    if (res.error) throw res.error;
+  }
   async function fetchInventoryFromDB(){
     if (!db) return [];
     var res = await db.from('inventory').select('*').order('category').order('item_type');
@@ -1196,6 +1206,27 @@
     });
   }
 
+  async function loadAndRenderBalanceHistory(recordNo){
+    var histWrap = document.getElementById('balanceHistoryWrap');
+    if (!histWrap) return;
+    try{
+      var history = await fetchBalanceHistory(recordNo);
+      if (!history.length){ histWrap.innerHTML = ''; return; }
+      histWrap.innerHTML =
+        '<fieldset><legend>Balance history</legend>' +
+        history.map(function(h){
+          return '<div class="option-row" style="display:block;">' +
+            '<div><strong>' + formatDate(h.created_at) + '</strong> &middot; returned: ' + escapeHtml(itemsSummary(h.returned_items || {})) + '</div>' +
+            (h.remark ? '<div class="helper">' + escapeHtml(h.remark) + '</div>' : '') +
+            '<div class="helper">by ' + escapeHtml(h.received_by || '') + '</div>' +
+          '</div>';
+        }).join('') +
+        '</fieldset>';
+    }catch(e){
+      histWrap.innerHTML = '';
+    }
+  }
+
   function openReturnChecklist(id){
     var rec = state.records.find(function(r){ return r.id === id; });
     if (!rec) return;
@@ -1213,6 +1244,7 @@
       '<div class="panel">' +
         '<h2>Checklist for ' + escapeHtml(rec.name) + '</h2>' +
         '<p class="sub"><span class="mono">' + rec.id + '</span> &middot; ' + (rec.type === 'rent' ? 'Rent' : 'Barrow') + ' &middot; out since ' + rec.dateOut + '</p>' +
+        '<div id="balanceHistoryWrap"></div>' +
         '<fieldset><legend>Items to check in</legend>' +
           checkItems.map(function(item, i){
             return '<div class="option-row"><label class="opt"><input type="checkbox" class="return-check" checked data-idx="' + i + '"> ' + item.label + '</label></div>';
@@ -1239,6 +1271,7 @@
       '</div>';
 
     wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    loadAndRenderBalanceHistory(id);
 
     function updateConfirmState(){
       var boxes = wrap.querySelectorAll('.return-check');
@@ -1308,11 +1341,14 @@
       errBox.classList.add('hidden');
 
       var stillOut = { chairs: [], tables: [], packages: [] };
+      var returnedNow = { chairs: [], tables: [], packages: [] };
       boxes.forEach(function(b){
         var item = checkItems[parseInt(b.getAttribute('data-idx'), 10)];
-        if (!b.checked){
-          var entry = { type: item.type, qty: item.qty };
-          if (item.note) entry.note = item.note;
+        var entry = { type: item.type, qty: item.qty };
+        if (item.note) entry.note = item.note;
+        if (b.checked){
+          returnedNow[item.bucket].push(entry);
+        } else {
           stillOut[item.bucket].push(entry);
         }
       });
@@ -1328,6 +1364,16 @@
           received_by: receivedBy,
           return_remark: remark
         });
+        try{
+          await insertBalanceHistory({
+            record_no: id,
+            returned_items: returnedNow,
+            remark: remark,
+            received_by: receivedBy
+          });
+        }catch(histErr){
+          showDbError('The return was saved, but the history log entry failed: ' + (histErr.message || histErr));
+        }
         var idx = state.records.findIndex(function(r){ return r.id === id; });
         if (idx !== -1) state.records[idx] = updated;
         updateAvailabilityHints();
@@ -1340,12 +1386,14 @@
             '</div>' +
             '<dl>' +
               '<dt>Name</dt><dd>' + escapeHtml(rec.name) + '</dd>' +
+              '<dt>Returned now</dt><dd>' + escapeHtml(itemsSummary(returnedNow)) + '</dd>' +
               '<dt>Still out</dt><dd>' + escapeHtml(itemsSummary(updated)) + '</dd>' +
               '<dt>Remark</dt><dd>' + escapeHtml(remark) + '</dd>' +
               '<dt>Recorded by</dt><dd>' + escapeHtml(receivedBy) + '</dd>' +
             '</dl>' +
           '</div>';
         document.getElementById('returnForm').classList.add('hidden');
+        loadAndRenderBalanceHistory(id);
         renderReturnResults(returnSearch.value.trim().toLowerCase());
       }catch(err){
         errBox.textContent = 'Could not save: ' + (err.message || err);
