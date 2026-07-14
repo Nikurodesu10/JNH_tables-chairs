@@ -1190,7 +1190,6 @@
             '<button class="btn btn-brass" data-open-return="' + r.id + '">Process return</button>' +
             '<button class="btn btn-ghost" data-open-add="' + r.id + '">Add items</button>' +
             '<button class="btn btn-ghost" data-open-transfer="' + r.id + '">Transfer</button>' +
-            '<button class="btn btn-ghost" data-open-additems="' + r.id + '">Add Items</button>' +
           '</div>' +
         '</div>' +
         '<div class="rec-items">Out since <span class="mono">' + r.dateOut + '</span>: ' + escapeHtml(itemsSummary(r)) + '</div>' +
@@ -1211,11 +1210,6 @@
     wrap.querySelectorAll('[data-open-transfer]').forEach(function(btn){
       btn.addEventListener('click', function(){
         openTransferForm(btn.getAttribute('data-open-transfer'));
-      });
-    });
-    wrap.querySelectorAll('[data-open-additems]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        openAddItemsForm(btn.getAttribute('data-open-additems'));
       });
     });
   }
