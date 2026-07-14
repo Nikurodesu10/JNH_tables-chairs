@@ -915,7 +915,8 @@
           if (!cb.checked) qtyInput.value = '';
         }
         if (cb.value === 'Other'){
-          var note = document.getElementById('borrowOtherNote');
+          var row = cb.closest('.option-row');
+          var note = row ? row.querySelector('input[type=text]') : null;
           if (note) note.disabled = !cb.checked;
         }
       });
@@ -952,7 +953,7 @@
     el.addEventListener('input', refreshRentTotal);
   });
 
-  function collectItems(checkboxClass, qtyClass, includeNote){
+  function collectItems(checkboxClass, qtyClass, noteFieldId){
     var out = [];
     document.querySelectorAll('.' + checkboxClass).forEach(function(cb){
       if (!cb.checked) return;
@@ -960,8 +961,9 @@
       var qty = parseInt(qtyInput && qtyInput.value, 10) || 0;
       if (qty <= 0) return;
       var entry = { type: cb.value, qty: qty };
-      if (includeNote && cb.value === 'Other'){
-        entry.note = (document.getElementById('borrowOtherNote').value || '').trim();
+      if (noteFieldId && cb.value === 'Other'){
+        var noteEl = document.getElementById(noteFieldId);
+        entry.note = noteEl ? (noteEl.value || '').trim() : '';
       }
       out.push(entry);
     });
@@ -1024,7 +1026,7 @@
     var barangay = document.getElementById('borrowBarangay').value.trim();
     var phone = document.getElementById('borrowPhone').value.trim();
     var chairs = collectItems('borrow-chair', 'borrow-chair-qty', false);
-    var tables = collectItems('borrow-table', 'borrow-table-qty', true);
+    var tables = collectItems('borrow-table', 'borrow-table-qty', 'borrowOtherNote');
     var errBox = document.getElementById('borrowFormError');
 
     if (!name || (chairs.length === 0 && tables.length === 0)){
@@ -1186,7 +1188,9 @@
           '</div>' +
           '<div class="row-actions">' +
             '<button class="btn btn-brass" data-open-return="' + r.id + '">Process return</button>' +
+            '<button class="btn btn-ghost" data-open-add="' + r.id + '">Add items</button>' +
             '<button class="btn btn-ghost" data-open-transfer="' + r.id + '">Transfer</button>' +
+            '<button class="btn btn-ghost" data-open-additems="' + r.id + '">Add Items</button>' +
           '</div>' +
         '</div>' +
         '<div class="rec-items">Out since <span class="mono">' + r.dateOut + '</span>: ' + escapeHtml(itemsSummary(r)) + '</div>' +
@@ -1199,9 +1203,19 @@
         openReturnChecklist(btn.getAttribute('data-open-return'));
       });
     });
+    wrap.querySelectorAll('[data-open-add]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        openAddItemsForm(btn.getAttribute('data-open-add'));
+      });
+    });
     wrap.querySelectorAll('[data-open-transfer]').forEach(function(btn){
       btn.addEventListener('click', function(){
         openTransferForm(btn.getAttribute('data-open-transfer'));
+      });
+    });
+    wrap.querySelectorAll('[data-open-additems]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        openAddItemsForm(btn.getAttribute('data-open-additems'));
       });
     });
   }
@@ -1399,6 +1413,171 @@
         errBox.textContent = 'Could not save: ' + (err.message || err);
         errBox.classList.remove('hidden');
         btn.disabled = false; btn.textContent = 'Balance (partial return)';
+      }
+    });
+  }
+
+  function openAddItemsForm(id){
+    var rec = state.records.find(function(r){ return r.id === id; });
+    if (!rec) return;
+    var wrap = document.getElementById('returnChecklistWrap');
+    var isRent = rec.type === 'rent';
+
+    var chairOptionsHtml = isRent ?
+      optRow('add-chair', 'Yellow', 'Yellow chair', '\u20b110 each') +
+      optRow('add-chair', 'White', 'White chair', '\u20b110 each') +
+      optRow('add-chair', "Kid's Chair", "Kid's chair", '\u20b15 each')
+      :
+      optRow('add-chair', 'White', 'White chair', '');
+
+    var tableOptionsHtml = isRent ?
+      optRow('add-table', 'Round', 'Round table', '\u20b1100 each') +
+      optRow('add-table', 'Long', 'Long table', '\u20b1100 each') +
+      optRow('add-table', 'Steel', 'Steel table', '\u20b150 each') +
+      optRow('add-table', 'Wood', 'Wood table', '\u20b150 each') +
+      optRow('add-table', 'Plastic Square', 'Plastic square table', '\u20b150 each') +
+      optRow('add-table', "Kid's Table", "Kid's table", '\u20b130 each')
+      :
+      optRow('add-table', 'Wood', 'Wood table', '') +
+      optRow('add-table', 'Steel', 'Steel table', '') +
+      optRow('add-table', 'Plastic Square', 'Plastic square table', '') +
+      '<div class="option-row"><label class="opt"><input type="checkbox" class="add-table" value="Other"> Other</label>' +
+        '<input type="number" min="0" placeholder="Qty" class="add-table-qty" data-for="Other" disabled>' +
+        '<input type="text" id="addOtherNote" placeholder="Specify other table..." disabled></div>';
+
+    var packageOptionsHtml = isRent ?
+      '<fieldset><legend>Kid\'s Set</legend>' + optRow('add-package', "Kid's Set", "Kid's Set", '4 chairs + 1 table \u00b7 \u20b150 each set') + '</fieldset>'
+      : '';
+
+    function optRow(cls, value, label, priceLabel){
+      return '<div class="option-row"><label class="opt"><input type="checkbox" class="' + cls + '" value="' + value + '"> ' + label + (priceLabel ? ' <span class="helper">' + priceLabel + '</span>' : '') + '</label>' +
+        '<input type="number" min="0" placeholder="Qty" class="' + cls + '-qty" data-for="' + value + '" disabled>' +
+        '<span class="helper avail-hint" data-item="' + value + '"></span></div>';
+    }
+
+    wrap.innerHTML =
+      '<div class="panel">' +
+        '<h2>Add items for ' + escapeHtml(rec.name) + '</h2>' +
+        '<p class="sub"><span class="mono">' + rec.id + '</span> &middot; ' + (isRent ? 'Rent' : 'Barrow') + ' &middot; currently out: ' + escapeHtml(itemsSummary(rec)) + '</p>' +
+        '<form id="addItemsForm">' +
+          '<div id="addItemsError" class="login-error hidden"></div>' +
+          '<fieldset><legend>Chairs</legend>' + chairOptionsHtml + '</fieldset>' +
+          '<fieldset><legend>Tables</legend>' + tableOptionsHtml + '</fieldset>' +
+          packageOptionsHtml +
+          '<div class="field"><label for="addItemsRemark">Remark (optional)</label><textarea id="addItemsRemark" rows="2" placeholder="Any notes about this addition..."></textarea></div>' +
+          (isRent ? '<div class="field"><label>Additional total</label><div class="readout" id="addItemsTotal" style="font-size:18px;">\u20b10</div></div>' : '') +
+          '<div class="grid2">' +
+            '<div class="field"><label>Date &amp; time</label><div class="readout">' + nowDisplay() + '</div></div>' +
+            '<div class="field"><label for="addItemsStaff">Added by (staff name)</label><input type="text" id="addItemsStaff" required></div>' +
+          '</div>' +
+          '<div class="row-actions">' +
+            '<button type="submit" class="btn btn-primary" id="addItemsSubmitBtn">Add to record</button>' +
+            '<button type="button" class="btn btn-ghost" id="cancelAddItems">Cancel</button>' +
+          '</div>' +
+        '</form>' +
+        '<div id="addItemsStub"></div>' +
+      '</div>';
+
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    wireCheckboxQty('.add-chair', 'add-chair-qty');
+    wireCheckboxQty('.add-table', 'add-table-qty');
+    if (isRent) wireCheckboxQty('.add-package', 'add-package-qty');
+    updateAvailabilityHints();
+
+    function refreshAddTotal(){
+      if (!isRent) return;
+      var chairs = collectItems('add-chair', 'add-chair-qty', false);
+      var tables = collectItems('add-table', 'add-table-qty', false);
+      var packages = collectItems('add-package', 'add-package-qty', false);
+      var total = computeRentTotal(chairs, tables, packages);
+      var el = document.getElementById('addItemsTotal');
+      if (el) el.textContent = '\u20b1' + total.toLocaleString();
+    }
+    wrap.querySelectorAll('.add-chair, .add-chair-qty, .add-table, .add-table-qty, .add-package, .add-package-qty').forEach(function(el){
+      el.addEventListener('change', refreshAddTotal);
+      el.addEventListener('input', refreshAddTotal);
+    });
+
+    document.getElementById('cancelAddItems').addEventListener('click', function(){
+      wrap.innerHTML = '';
+    });
+
+    function mergeItems(existing, added){
+      var merged = (existing || []).map(function(e){ return Object.assign({}, e); });
+      added.forEach(function(a){
+        if (a.type === 'Other'){ merged.push(Object.assign({}, a)); return; }
+        var match = merged.find(function(m){ return m.type === a.type; });
+        if (match){ match.qty += a.qty; } else { merged.push(Object.assign({}, a)); }
+      });
+      return merged;
+    }
+
+    document.getElementById('addItemsForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      var staffName = document.getElementById('addItemsStaff').value.trim();
+      var remark = document.getElementById('addItemsRemark').value.trim();
+      var errBox = document.getElementById('addItemsError');
+      var addedChairs = collectItems('add-chair', 'add-chair-qty', false);
+      var addedTables = collectItems('add-table', 'add-table-qty', 'addOtherNote');
+      var addedPackages = isRent ? collectItems('add-package', 'add-package-qty', false) : [];
+
+      if (!staffName || (addedChairs.length === 0 && addedTables.length === 0 && addedPackages.length === 0)){
+        errBox.textContent = 'Please add the staff name and at least one item with a quantity.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+      errBox.classList.add('hidden');
+
+      var mergedChairs = mergeItems(rec.chairs, addedChairs);
+      var mergedTables = mergeItems(rec.tables, addedTables);
+      var mergedPackages = mergeItems(rec.packages, addedPackages);
+      var patch = { chairs: mergedChairs, tables: mergedTables, packages: mergedPackages };
+      var addedTotal = 0;
+      if (isRent){
+        addedTotal = computeRentTotal(addedChairs, addedTables, addedPackages);
+        patch.total_price = (rec.totalPrice || 0) + addedTotal;
+      }
+
+      var btn = document.getElementById('addItemsSubmitBtn');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try{
+        var updated = await updateRecordInDB(id, patch);
+        var idx = state.records.findIndex(function(r){ return r.id === id; });
+        if (idx !== -1) state.records[idx] = updated;
+        updateAvailabilityHints();
+
+        try{
+          await insertBalanceHistory({
+            record_no: id,
+            returned_items: { chairs: addedChairs, tables: addedTables, packages: addedPackages },
+            remark: 'Added items' + (remark ? ': ' + remark : ''),
+            received_by: staffName
+          });
+        }catch(histErr){
+          showDbError('Items were added, but the history log entry failed: ' + (histErr.message || histErr));
+        }
+
+        var stubWrap = document.getElementById('addItemsStub');
+        stubWrap.innerHTML =
+          '<div class="stub">' +
+            '<div class="stub-head">' +
+              '<div><div class="stub-id mono">' + updated.id + '</div><div class="helper">Items added</div></div>' +
+              '<div class="stamp out">Added</div>' +
+            '</div>' +
+            '<dl>' +
+              '<dt>Name</dt><dd>' + escapeHtml(rec.name) + '</dd>' +
+              '<dt>Added now</dt><dd>' + escapeHtml(itemsSummary({ chairs: addedChairs, tables: addedTables, packages: addedPackages })) + '</dd>' +
+              '<dt>Now out (total)</dt><dd>' + escapeHtml(itemsSummary(updated)) + '</dd>' +
+              (isRent ? '<dt>New total</dt><dd>\u20b1' + Number(updated.totalPrice).toLocaleString() + '</dd>' : '') +
+              '<dt>Added by</dt><dd>' + escapeHtml(staffName) + '</dd>' +
+            '</dl>' +
+          '</div>';
+        document.getElementById('addItemsForm').classList.add('hidden');
+        renderReturnResults(returnSearch.value.trim().toLowerCase());
+      }catch(err){
+        errBox.textContent = 'Could not save: ' + (err.message || err);
+        errBox.classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Add to record';
       }
     });
   }
