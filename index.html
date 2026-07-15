@@ -523,6 +523,11 @@
               <input type="number" min="0" placeholder="Qty" class="borrow-chair-qty" data-for="White" disabled>
               <span class="helper avail-hint" data-item="White"></span>
             </div>
+            <div class="option-row">
+              <label class="opt"><input type="checkbox" class="borrow-chair" value="Yellow"> Yellow chair</label>
+              <input type="number" min="0" placeholder="Qty" class="borrow-chair-qty" data-for="Yellow" disabled>
+              <span class="helper avail-hint" data-item="Yellow"></span>
+            </div>
           </fieldset>
 
           <fieldset>
@@ -1422,7 +1427,8 @@
       optRow('add-chair', 'White', 'White chair', '\u20b110 each') +
       optRow('add-chair', "Kid's Chair", "Kid's chair", '\u20b15 each')
       :
-      optRow('add-chair', 'White', 'White chair', '');
+      optRow('add-chair', 'White', 'White chair', '') +
+      optRow('add-chair', 'Yellow', 'Yellow chair', '');
 
     var tableOptionsHtml = isRent ?
       optRow('add-table', 'Round', 'Round table', '\u20b1100 each') +
